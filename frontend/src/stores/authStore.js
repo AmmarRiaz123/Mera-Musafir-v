@@ -31,6 +31,11 @@ export const useAuthStore = defineStore('auth', {
         this.clearAuthData()
       }
     },
+    async updateProfile(formData) {
+      const response = await api.put(`/api/v1/users/${this.user.id}`, formData)
+      this.user = response.data.data
+      localStorage.setItem('user', JSON.stringify(this.user))
+    },
     setAuthData(data) {
       this.user = data.user
       this.token = data.token

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\DestinationController;
+use App\Http\Controllers\Api\V1\UserController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/ping', function () {
@@ -15,6 +16,7 @@ Route::prefix('v1')->group(function () {
     // Public Routes
     Route::get('/destinations', [DestinationController::class, 'index']);
     Route::get('/destinations/{destination}', [DestinationController::class, 'show']);
+    Route::get('/users/{user}', [UserController::class, 'show']);
 
     // Auth Routes
     Route::post('/register', [AuthController::class, 'register']);
@@ -22,6 +24,9 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
+        
+        // Profile update route
+        Route::put('/users/{user}', [UserController::class, 'update']);
         
         // User check route
         Route::get('/user', function (\Illuminate\Http\Request $request) {
@@ -34,3 +39,4 @@ Route::prefix('v1')->group(function () {
         });
     });
 });
+
