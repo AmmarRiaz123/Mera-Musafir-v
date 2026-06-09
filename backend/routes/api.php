@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\DestinationController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/ping', function () {
@@ -10,6 +11,10 @@ Route::prefix('v1')->group(function () {
             'status'  => 'ok'
         ]);
     });
+
+    // Public Routes
+    Route::get('/destinations', [DestinationController::class, 'index']);
+    Route::get('/destinations/{destination}', [DestinationController::class, 'show']);
 
     // Auth Routes
     Route::post('/register', [AuthController::class, 'register']);

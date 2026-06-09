@@ -47,5 +47,11 @@ class DatabaseSeeder extends Seeder
             ]
         );
         $traveler->assignRole('traveler');
+
+        // Seed destinations
+        $this->call([
+            DestinationSeeder::class,
+        ]);
     }
 }
+
