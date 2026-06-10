@@ -8,7 +8,11 @@ const routes = [
       { path: 'destinations', component: () => import('pages/destinations/DestinationsPage.vue') },
       { path: 'destinations/:slug', component: () => import('pages/destinations/DestinationDetailPage.vue') },
       { path: 'profile', component: () => import('pages/profile/ProfilePage.vue') },
-      { path: 'profile/:id', component: () => import('pages/profile/ProfilePage.vue') }
+      { path: 'profile/:id', component: () => import('pages/profile/ProfilePage.vue') },
+      { path: 'trips', component: () => import('pages/trips/TripsPage.vue') },
+      { path: 'trips/create', component: () => import('pages/trips/CreateTripPage.vue') },
+      { path: 'trips/:id', component: () => import('pages/trips/TripDetailPage.vue') },
+      { path: 'my-trips', component: () => import('pages/trips/MyTripsPage.vue') },
     ],
   },
   {
