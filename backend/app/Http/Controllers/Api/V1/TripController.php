@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Trip\CreateTripRequest;
 use App\Http\Requests\Trip\UpdateTripRequest;
 use App\Http\Resources\TripResource;
+use App\Models\GroupChat;
 use App\Models\Trip;
 use App\Models\TripMember;
 use Illuminate\Http\Request;
@@ -102,6 +103,12 @@ class TripController extends Controller
             'status'    => 'joined',
             'role'      => 'host',
             'joined_at' => now(),
+        ]);
+
+        // Auto-create group chat for this trip
+        GroupChat::create([
+            'trip_id' => $trip->id,
+            'name'    => $trip->title . ' Chat',
         ]);
 
         $trip->load(['creator', 'destination', 'joinedMembers']);

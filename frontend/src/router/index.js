@@ -36,10 +36,12 @@ export default defineRouter(({ store /*, ssrContext */ }) => {
 
   Router.beforeEach((to, from, next) => {
     const authStore = useAuthStore(store)
-    
+
     if (to.meta.requiresAuth && !authStore.isLoggedIn) {
       next('/login')
     } else if (to.meta.guestOnly && authStore.isLoggedIn) {
+      next('/')
+    } else if (to.meta.requiresAgencyOwner && authStore.user?.type !== 'agency') {
       next('/')
     } else {
       next()

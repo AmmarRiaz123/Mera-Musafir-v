@@ -71,6 +71,26 @@ class Trip extends Model
         return $this->current_count >= $this->max_travelers;
     }
 
+    public function chat()
+    {
+        return $this->hasOne(GroupChat::class);
+    }
+
+    public function itineraryDays()
+    {
+        return $this->hasMany(ItineraryDay::class)->orderBy('day_number');
+    }
+
+    public function expenses()
+    {
+        return $this->hasMany(Expense::class);
+    }
+
+    public function checklistItems()
+    {
+        return $this->hasMany(ChecklistItem::class)->orderBy('order_index');
+    }
+
     // Check if a user is already a member
     public function hasMember(int $userId): bool
     {

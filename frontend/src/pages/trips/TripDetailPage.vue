@@ -109,6 +109,29 @@
         <div class="text-body1 text-grey-9" style="line-height: 1.8;">{{ trip.description }}</div>
       </div>
 
+      <!-- Trip tools (members only) -->
+      <div v-if="isHost || isJoined" class="q-mb-lg">
+        <div class="text-subtitle2 text-grey-7 q-mb-sm">Trip Tools</div>
+        <div class="row q-gutter-sm">
+          <q-btn
+            unelevated rounded icon="chat" label="Chat" color="primary"
+            :to="`/trips/${trip.id}/chat?name=${encodeURIComponent(trip.title)}`"
+          />
+          <q-btn
+            unelevated rounded icon="map" label="Itinerary" color="deep-purple"
+            :to="`/trips/${trip.id}/itinerary`"
+          />
+          <q-btn
+            unelevated rounded icon="account_balance_wallet" label="Expenses" color="teal"
+            :to="`/trips/${trip.id}/expenses`"
+          />
+          <q-btn
+            unelevated rounded icon="checklist" label="Checklist" color="orange-8"
+            :to="`/trips/${trip.id}/checklist`"
+          />
+        </div>
+      </div>
+
       <!-- Join / Leave action -->
       <q-card flat bordered class="q-mb-xl bg-purple-1">
         <q-card-section class="row items-center justify-between">

@@ -58,6 +58,20 @@
 
         <q-separator class="q-my-sm" />
 
+        <q-item-label header class="text-caption text-grey-6">DISCOVER</q-item-label>
+
+        <q-item clickable v-ripple to="/packages">
+          <q-item-section avatar><q-icon name="card_travel" /></q-item-section>
+          <q-item-section>Packages</q-item-section>
+        </q-item>
+
+        <q-item clickable v-ripple to="/agencies">
+          <q-item-section avatar><q-icon name="business" /></q-item-section>
+          <q-item-section>Agencies</q-item-section>
+        </q-item>
+
+        <q-separator class="q-my-sm" />
+
         <q-item-label header class="text-caption text-grey-6">ACCOUNT</q-item-label>
 
         <q-item clickable v-ripple to="/profile">
