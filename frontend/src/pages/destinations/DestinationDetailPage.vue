@@ -11,13 +11,13 @@
     </div>
 
     <div v-else>
-      <q-btn 
-        flat 
-        color="primary" 
-        icon="arrow_back" 
-        label="Back to Destinations" 
-        @click="$router.push('/destinations')" 
-        class="q-mb-md" 
+      <q-btn
+        flat
+        color="primary"
+        icon="arrow_back"
+        label="Back to Destinations"
+        @click="$router.push('/destinations')"
+        class="q-mb-md"
       />
 
       <q-img
@@ -54,20 +54,110 @@
         </q-card-section>
       </q-card>
 
-      <div v-if="destination.coordinates && destination.coordinates.lat" class="row items-center text-grey-7 q-mb-lg bg-grey-2 q-pa-md rounded-borders">
+      <div v-if="destination.coordinates && destination.coordinates.lat" class="row items-center text-grey-7 q-mb-xl bg-grey-2 q-pa-md rounded-borders">
         <q-icon name="place" size="sm" color="red" class="q-mr-sm" />
         <span class="text-subtitle2">
           <strong>Coordinates:</strong> Lat {{ destination.coordinates.lat }}, Lng {{ destination.coordinates.lng }}
         </span>
+      </div>
+
+      <!-- Packages section -->
+      <div class="q-mb-xl">
+        <div class="row items-center justify-between q-mb-md">
+          <div>
+            <div class="text-h6 text-weight-bold">Travel Packages Here</div>
+            <div class="text-caption text-grey-6">Packages offered by agencies for {{ destination.name }}</div>
+          </div>
+          <q-btn flat color="deep-purple" label="All Packages" icon-right="arrow_forward" to="/packages" />
+        </div>
+
+        <!-- Loading -->
+        <div v-if="pkgLoading" class="row q-col-gutter-md">
+          <div v-for="n in 3" :key="n" class="col-12 col-sm-6 col-md-4">
+            <q-card flat bordered>
+              <q-skeleton height="160px" square />
+              <q-card-section>
+                <q-skeleton type="text" class="text-subtitle1" />
+                <q-skeleton type="text" width="60%" />
+                <q-skeleton type="text" width="40%" />
+              </q-card-section>
+            </q-card>
+          </div>
+        </div>
+
+        <!-- Empty -->
+        <div v-else-if="packages.length === 0" class="text-center q-py-lg bg-grey-1 rounded-borders">
+          <q-icon name="card_travel" size="3em" color="grey-4" />
+          <div class="text-body2 text-grey-5 q-mt-sm">No packages available for this destination yet</div>
+        </div>
+
+        <!-- Package cards -->
+        <div v-else class="row q-col-gutter-md">
+          <div v-for="pkg in packages" :key="pkg.id" class="col-12 col-sm-6 col-md-4">
+            <q-card
+              class="cursor-pointer card-hover"
+              flat bordered
+              @click="$router.push(`/packages/${pkg.slug}`)"
+            >
+              <q-img
+                :src="pkg.cover_image || 'https://via.placeholder.com/600x400?text=Package'"
+                ratio="1.7778"
+                class="bg-grey-3"
+              >
+                <div class="absolute-top-right q-pa-sm">
+                  <q-badge color="deep-purple" class="shadow-1 q-pa-xs text-caption capitalize">
+                    {{ pkg.type?.replace('_', ' ') }}
+                  </q-badge>
+                </div>
+                <div v-if="pkg.is_full" class="absolute-bottom bg-negative text-white text-center text-caption q-pa-xs">
+                  FULLY BOOKED
+                </div>
+              </q-img>
+
+              <q-card-section>
+                <div class="text-subtitle1 text-weight-bold ellipsis">{{ pkg.title }}</div>
+                <div class="row items-center text-caption text-grey-7 q-mt-xs q-gutter-xs">
+                  <q-icon name="business" size="xs" />
+                  <span>{{ pkg.agency?.business_name }}</span>
+                  <q-icon v-if="pkg.agency?.is_verified" name="verified" color="primary" size="10px" />
+                </div>
+              </q-card-section>
+
+              <q-card-section class="q-pt-none">
+                <div class="row items-center justify-between q-mb-xs">
+                  <div class="text-h6 text-weight-bold text-deep-purple">{{ pkg.formatted_price }}</div>
+                  <div class="text-caption text-grey-6">per person</div>
+                </div>
+                <div class="row items-center justify-between text-caption text-grey-7">
+                  <div class="row items-center">
+                    <q-icon name="calendar_today" size="xs" class="q-mr-xs" />
+                    {{ fmtDate(pkg.start_date) }}
+                  </div>
+                  <div>{{ pkg.duration_days }}D</div>
+                  <div class="row items-center" :class="pkg.spots_left < 5 ? 'text-negative' : ''">
+                    <q-icon name="event_seat" size="xs" class="q-mr-xs" />
+                    {{ pkg.spots_left }} left
+                  </div>
+                </div>
+              </q-card-section>
+
+              <q-card-actions class="q-pt-none">
+                <q-space />
+                <q-btn flat color="deep-purple" label="View Package" dense :to="`/packages/${pkg.slug}`" />
+              </q-card-actions>
+            </q-card>
+          </div>
+        </div>
       </div>
     </div>
   </q-page>
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDestinationStore } from 'src/stores/destinationStore'
+import { api } from 'src/boot/axios'
 
 const route = useRoute()
 const router = useRouter() // eslint-disable-line no-unused-vars
@@ -75,20 +165,43 @@ const destinationStore = useDestinationStore()
 
 const destination = computed(() => destinationStore.currentDestination)
 
+const packages = ref([])
+const pkgLoading = ref(false)
+
 onMounted(async () => {
   const slug = route.params.slug
   if (slug) {
     try {
       await destinationStore.fetchDestination(slug)
+      if (destination.value?.id) {
+        loadPackages(destination.value.id)
+      }
     } catch (e) {
       console.error(e)
     }
   }
 })
+
+const loadPackages = async (destinationId) => {
+  pkgLoading.value = true
+  try {
+    const r = await api.get('/api/v1/packages', { params: { destination_id: destinationId, per_page: 6 } })
+    packages.value = r.data.data
+  } catch {
+    packages.value = []
+  } finally {
+    pkgLoading.value = false
+  }
+}
+
+const fmtDate = (d) => {
+  if (!d) return '—'
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 </script>
 
 <style scoped>
-.capitalize {
-  text-transform: capitalize;
-}
+.capitalize { text-transform: capitalize; }
+.card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+.card-hover:hover { transform: translateY(-4px); box-shadow: 0 4px 15px rgba(0,0,0,.1); }
 </style>

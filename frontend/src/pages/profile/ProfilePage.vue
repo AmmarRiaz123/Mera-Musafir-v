@@ -40,12 +40,27 @@
             </q-badge>
           </div>
 
-          <div v-if="profileUser.preferences && profileUser.preferences.length" class="q-mt-lg">
-            <div class="text-subtitle2 text-grey-8 q-mb-sm">Travel Preferences:</div>
+          <div v-if="profileUser.preferences?.travel_style?.length" class="q-mt-md">
+            <div class="text-subtitle2 text-grey-8 q-mb-sm">Travel Style:</div>
             <div class="row q-gutter-xs">
-              <q-badge v-for="pref in profileUser.preferences" :key="pref" color="accent" class="q-px-sm q-py-xs">
-                {{ pref }}
-              </q-badge>
+              <q-badge
+                v-for="style in profileUser.preferences.travel_style"
+                :key="style"
+                color="primary"
+                class="q-px-sm q-py-xs capitalize"
+              >{{ style }}</q-badge>
+            </div>
+          </div>
+
+          <div v-if="profileUser.preferences?.regions?.length" class="q-mt-sm">
+            <div class="text-subtitle2 text-grey-8 q-mb-sm">Regions of Interest:</div>
+            <div class="row q-gutter-xs">
+              <q-badge
+                v-for="region in profileUser.preferences.regions"
+                :key="region"
+                color="deep-purple"
+                class="q-px-sm q-py-xs"
+              >{{ region }}</q-badge>
             </div>
           </div>
         </q-card-section>
@@ -107,6 +122,37 @@
               class="capitalize"
             />
 
+            <q-separator class="q-my-xs" />
+
+            <div>
+              <div class="text-caption text-grey-7 q-mb-xs">Travel Style</div>
+              <div class="row q-gutter-xs">
+                <q-chip
+                  v-for="style in styleOptions"
+                  :key="style"
+                  clickable
+                  :color="form.preferences.travel_style.includes(style) ? 'primary' : 'grey-3'"
+                  :text-color="form.preferences.travel_style.includes(style) ? 'white' : 'grey-8'"
+                  @click="togglePref(form.preferences.travel_style, style)"
+                  class="capitalize"
+                >{{ style }}</q-chip>
+              </div>
+            </div>
+
+            <div>
+              <div class="text-caption text-grey-7 q-mb-xs">Regions of Interest</div>
+              <div class="row q-gutter-xs">
+                <q-chip
+                  v-for="region in regionOptions"
+                  :key="region"
+                  clickable
+                  :color="form.preferences.regions.includes(region) ? 'deep-purple' : 'grey-3'"
+                  :text-color="form.preferences.regions.includes(region) ? 'white' : 'grey-8'"
+                  @click="togglePref(form.preferences.regions, region)"
+                >{{ region }}</q-chip>
+              </div>
+            </div>
+
             <div v-if="saveError" class="text-negative text-center q-mt-sm">
               {{ saveError }}
             </div>
@@ -141,12 +187,16 @@ const isEditMode = ref(false)
 const saving = ref(false)
 const saveError = ref('')
 
+const styleOptions = ['adventure', 'cultural', 'budget', 'luxury', 'backpacking']
+const regionOptions = ['Punjab', 'Sindh', 'KPK', 'Balochistan', 'Gilgit-Baltistan', 'AJK', 'Islamabad']
+
 const form = ref({
   name: '',
   bio: '',
   city: '',
   phone: '',
-  gender: null
+  gender: null,
+  preferences: { travel_style: [], regions: [] },
 })
 
 // Check if viewing own profile
@@ -187,13 +237,23 @@ const loadProfile = async () => {
   }
 }
 
+const togglePref = (arr, value) => {
+  const i = arr.indexOf(value)
+  if (i === -1) arr.push(value)
+  else arr.splice(i, 1)
+}
+
 const toggleEditMode = () => {
   form.value = {
     name: profileUser.value.name || '',
     bio: profileUser.value.bio || '',
     city: profileUser.value.city || '',
     phone: profileUser.value.phone || '',
-    gender: profileUser.value.gender || null
+    gender: profileUser.value.gender || null,
+    preferences: {
+      travel_style: [...(profileUser.value.preferences?.travel_style || [])],
+      regions: [...(profileUser.value.preferences?.regions || [])],
+    },
   }
   saveError.value = ''
   isEditMode.value = true

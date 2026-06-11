@@ -28,7 +28,11 @@ class DestinationController extends Controller
             $query->where('name', 'like', '%' . $request->search . '%');
         }
 
-        $destinations = $query->paginate(15);
+        if ($request->boolean('featured')) {
+            $query->where('is_featured', true);
+        }
+
+        $destinations = $query->paginate($request->integer('per_page', 15));
 
         // API convention: adding message to resource collection response
         return DestinationResource::collection($destinations)->additional([

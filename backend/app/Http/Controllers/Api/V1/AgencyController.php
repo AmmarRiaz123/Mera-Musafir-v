@@ -70,7 +70,7 @@ class AgencyController extends Controller
     // GET /agencies — public
     public function index(Request $request)
     {
-        $query = Agency::where('is_verified', true)->withCount('packages');
+        $query = Agency::withCount('packages');
 
         if ($request->search) {
             $query->where('business_name', 'like', '%' . $request->search . '%');

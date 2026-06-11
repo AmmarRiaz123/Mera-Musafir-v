@@ -41,7 +41,7 @@ class PackageController extends Controller
             $query->whereDate('start_date', '>=', $request->start_date);
         }
 
-        $packages = $query->paginate(12);
+        $packages = $query->paginate($request->integer('per_page', 12));
 
         return PackageResource::collection($packages)->additional(['message' => 'Packages retrieved']);
     }

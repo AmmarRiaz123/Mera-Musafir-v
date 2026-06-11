@@ -4,7 +4,7 @@ const routes = [
     component: () => import('layouts/MainLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: '', component: () => import('pages/IndexPage.vue') },
+      { path: '', component: () => import('pages/HomePage.vue') },
       { path: 'destinations', component: () => import('pages/destinations/DestinationsPage.vue') },
       { path: 'destinations/:slug', component: () => import('pages/destinations/DestinationDetailPage.vue') },
       { path: 'profile', component: () => import('pages/profile/ProfilePage.vue') },

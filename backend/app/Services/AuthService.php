@@ -11,22 +11,26 @@ class AuthService
     /**
      * Register a new user and assign appropriate role.
      */
-    public function register(array $data): User
+    public function register(array $data): array // returns ['user' => User, 'token' => string]
     {
         $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'] ?? null,
-            'password' => Hash::make($data['password']),
-            'type' => $data['type'],
+            'name'        => $data['name'],
+            'email'       => $data['email'],
+            'phone'       => $data['phone'] ?? null,
+            'password'    => Hash::make($data['password']),
+            'type'        => $data['type'],
+            'city'        => $data['city'] ?? null,
+            'gender'      => $data['gender'] ?? null,
+            'preferences' => $data['preferences'] ?? null,
         ]);
 
-        // Assign the appropriate role based on user type
         if (in_array($data['type'], ['traveler', 'agency'])) {
             $user->assignRole($data['type']);
         }
 
-        return $user;
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return ['user' => $user, 'token' => $token];
     }
 
     /**

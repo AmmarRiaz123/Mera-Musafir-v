@@ -129,6 +129,10 @@
             unelevated rounded icon="checklist" label="Checklist" color="orange-8"
             :to="`/trips/${trip.id}/checklist`"
           />
+          <q-btn
+            unelevated rounded icon="person_add" label="Invite" color="secondary"
+            @click="openInviteDialog"
+          />
         </div>
       </div>
 
@@ -189,6 +193,55 @@
         </div>
       </div>
 
+      <!-- Suggested travelers (host only) -->
+      <div v-if="isHost" class="q-mb-xl">
+        <div class="text-h6 q-mb-xs">People who might want to join</div>
+        <div class="text-caption text-grey-6 q-mb-md">Matched by travel style, region interest, and activity</div>
+
+        <div v-if="matchStore.travelersLoading" class="row q-gutter-sm">
+          <q-card v-for="n in 4" :key="n" flat bordered style="width:160px">
+            <q-card-section class="text-center">
+              <q-skeleton type="QAvatar" size="48px" class="q-mx-auto q-mb-sm" />
+              <q-skeleton type="text" width="80%" class="q-mx-auto" />
+              <q-skeleton type="text" width="50%" class="q-mx-auto" />
+            </q-card-section>
+          </q-card>
+        </div>
+
+        <div v-else-if="matchStore.suggestedTravelers.length === 0" class="text-grey-5 text-body2">
+          No matching travelers found yet.
+        </div>
+
+        <div v-else class="row q-col-gutter-sm">
+          <div
+            v-for="item in matchStore.suggestedTravelers"
+            :key="item.user.id"
+            class="col-6 col-sm-4 col-md-3"
+          >
+            <q-card flat bordered class="text-center q-pa-md">
+              <q-avatar size="48px" color="deep-purple-1" text-color="deep-purple" class="q-mb-xs">
+                <img v-if="item.user.avatar" :src="item.user.avatar" />
+                <span v-else class="text-weight-bold">{{ item.user.name?.[0]?.toUpperCase() }}</span>
+              </q-avatar>
+              <div class="text-weight-bold text-body2 ellipsis">{{ item.user.name }}</div>
+              <div class="text-caption text-grey-6" v-if="item.user.city">{{ item.user.city }}</div>
+              <q-badge color="deep-purple-1" text-color="deep-purple-9" class="q-mt-xs" style="font-size:10px">
+                {{ item.score }}% match
+              </q-badge>
+              <div class="q-mt-sm">
+                <q-btn
+                  unelevated rounded dense
+                  color="deep-purple"
+                  label="Invite"
+                  size="sm"
+                  @click="inviteUser(item.user)"
+                />
+              </div>
+            </q-card>
+          </div>
+        </div>
+      </div>
+
       <!-- Members list -->
       <div v-if="trip.members && trip.members.length">
         <div class="text-h6 q-mb-md">
@@ -216,6 +269,29 @@
       </div>
     </div>
 
+    <!-- Invite dialog -->
+    <q-dialog v-model="inviteDialog">
+      <q-card style="min-width: 320px">
+        <q-card-section>
+          <div class="text-h6">Invite Someone</div>
+          <div class="text-caption text-grey-6">Enter the name or share a link (feature coming soon)</div>
+        </q-card-section>
+        <q-card-section class="q-pt-none">
+          <q-input
+            v-model="inviteName"
+            outlined
+            label="Name or username"
+            autofocus
+            @keyup.enter="sendInvite"
+          />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" v-close-popup />
+          <q-btn unelevated color="secondary" label="Send Invite" @click="sendInvite" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <!-- Leave confirm dialog -->
     <q-dialog v-model="leaveDialog">
       <q-card style="min-width: 300px">
@@ -240,15 +316,19 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useTripStore } from 'src/stores/tripStore'
 import { useAuthStore } from 'src/stores/authStore'
+import { useMatchStore } from 'src/stores/matchStore'
 
 const route = useRoute()
 const router = useRouter() // eslint-disable-line no-unused-vars
 const $q = useQuasar()
 const tripStore = useTripStore()
 const authStore = useAuthStore()
+const matchStore = useMatchStore()
 
 const actionLoading = ref(false)
 const leaveDialog = ref(false)
+const inviteDialog = ref(false)
+const inviteName = ref('')
 
 const trip = computed(() => tripStore.currentTrip)
 
@@ -267,6 +347,9 @@ onMounted(async () => {
   if (id) {
     try {
       await tripStore.fetchTrip(id)
+      if (isHost.value) {
+        matchStore.fetchSuggestedTravelers(id)
+      }
     } catch {
       // handled in template via trip === null
     }
@@ -302,6 +385,21 @@ const doLeave = async () => {
   } finally {
     actionLoading.value = false
   }
+}
+
+const openInviteDialog = () => {
+  inviteName.value = ''
+  inviteDialog.value = true
+}
+
+const sendInvite = () => {
+  inviteDialog.value = false
+  $q.notify({ color: 'info', message: 'Invite feature coming soon', icon: 'person_add' })
+}
+
+const inviteUser = (user) => {
+  inviteName.value = user.name
+  inviteDialog.value = true
 }
 
 const formatDate = (dateStr) => {

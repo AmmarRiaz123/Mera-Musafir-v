@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\DestinationController;
+use App\Http\Controllers\Api\V1\MatchingController;
 use App\Http\Controllers\Api\V1\PackageController;
 use App\Http\Controllers\Api\V1\PlanningController;
 use App\Http\Controllers\Api\V1\TripController;
@@ -90,6 +91,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/trips/{trip}/expenses',                           [PlanningController::class, 'getExpenses']);
         Route::post('/trips/{trip}/expenses',                          [PlanningController::class, 'addExpense']);
         Route::post('/trips/{trip}/expenses/shares/{share}/settle',    [PlanningController::class, 'settleShare']);
+
+        // Matching / recommendations
+        Route::get('/match/trips',                          [MatchingController::class, 'suggestTrips']);
+        Route::get('/match/trips/{trip}/travelers',         [MatchingController::class, 'suggestTravelers']);
 
         // Checklist
         Route::get('/trips/{trip}/checklist',                          [PlanningController::class, 'getChecklist']);
