@@ -40,6 +40,7 @@ class User extends Authenticatable
         'is_verified',
         'is_blocked',
         'preferences',
+        'dm_privacy',
     ];
 
     protected $hidden = [
@@ -50,6 +51,57 @@ class User extends Authenticatable
     public function agency()
     {
         return $this->hasOne(Agency::class);
+    }
+
+    public function following()
+    {
+        return $this->hasMany(UserFollow::class, 'follower_id');
+    }
+
+    public function followers()
+    {
+        return $this->hasMany(UserFollow::class, 'following_id');
+    }
+
+    public function isFollowing(int $userId): bool
+    {
+        return $this->following()->where('following_id', $userId)->exists();
+    }
+
+    public function isFriendsWith(int $userId): bool
+    {
+        return $this->isFollowing($userId) &&
+            static::find($userId)?->isFollowing($this->id);
+    }
+
+    public function conversationsAsOne()
+    {
+        return $this->hasMany(Conversation::class, 'user_one_id');
+    }
+
+    public function conversationsAsTwo()
+    {
+        return $this->hasMany(Conversation::class, 'user_two_id');
+    }
+
+    public function blockedUsers()
+    {
+        return $this->hasMany(BlockedUser::class, 'blocker_id');
+    }
+
+    public function blockedByUsers()
+    {
+        return $this->hasMany(BlockedUser::class, 'blocked_id');
+    }
+
+    public function isBlockedBy(int $userId): bool
+    {
+        return $this->blockedByUsers()->where('blocker_id', $userId)->exists();
+    }
+
+    public function hasBlocked(int $userId): bool
+    {
+        return $this->blockedUsers()->where('blocked_id', $userId)->exists();
     }
 
     /**

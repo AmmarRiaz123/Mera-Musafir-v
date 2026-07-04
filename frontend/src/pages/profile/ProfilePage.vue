@@ -15,14 +15,56 @@
     <q-card v-else class="q-pa-md shadow-2" style="width: 100%; max-width: 600px; border-radius: 12px">
       <!-- VIEW MODE -->
       <div v-if="!isEditMode">
+        <!-- Header row with settings/actions -->
+        <q-card-section class="row items-start justify-between q-pb-none">
+          <div class="q-pt-sm">
+            <!-- Privacy settings link for own profile -->
+            <q-btn v-if="isOwnProfile" flat round icon="settings" color="grey-7" size="sm" to="/privacy">
+              <q-tooltip>Privacy Settings</q-tooltip>
+            </q-btn>
+          </div>
+          <!-- Three-dot menu for other profiles -->
+          <div v-if="!isOwnProfile && authStore.isLoggedIn">
+            <q-btn flat round icon="more_vert" color="grey-7">
+              <q-menu anchor="bottom right" self="top right">
+                <q-list style="min-width: 180px">
+                  <q-item clickable v-close-popup @click="handleBlock">
+                    <q-item-section avatar>
+                      <q-icon :name="safetyStore.isBlocked(profileUser.id) ? 'person_add' : 'block'" color="grey-8" />
+                    </q-item-section>
+                    <q-item-section>{{ safetyStore.isBlocked(profileUser.id) ? 'Unblock User' : 'Block User' }}</q-item-section>
+                  </q-item>
+                  <q-item clickable v-close-popup @click="reportDialog = true">
+                    <q-item-section avatar>
+                      <q-icon name="flag" color="negative" />
+                    </q-item-section>
+                    <q-item-section class="text-negative">Report User</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
+            </q-btn>
+          </div>
+        </q-card-section>
+
         <q-card-section class="text-center">
           <q-avatar size="100px" color="grey-4" text-color="grey-8">
             <img v-if="profileUser.avatar" :src="profileUser.avatar" />
             <span v-else class="text-h3">{{ profileUser.name.charAt(0).toUpperCase() }}</span>
           </q-avatar>
-          <div class="text-h5 q-mt-md text-weight-bold">{{ profileUser.name }}</div>
+          <div class="row justify-center items-center q-mt-md q-gutter-xs">
+            <div class="text-h5 text-weight-bold">{{ profileUser.name }}</div>
+            <q-icon v-if="profileUser.is_verified" name="verified" color="deep-purple" size="22px">
+              <q-tooltip>Verified User</q-tooltip>
+            </q-icon>
+            <q-badge v-if="isFriend" color="deep-purple" label="Friends" />
+          </div>
           <div v-if="profileUser.city" class="text-subtitle1 text-grey-8">
             <q-icon name="place" /> {{ profileUser.city }}
+          </div>
+          <!-- Follower / following counts for other profiles -->
+          <div v-if="!isOwnProfile" class="row justify-center q-gutter-lg q-mt-sm text-caption text-grey-7">
+            <div><span class="text-weight-bold text-dark">{{ followersCount }}</span> followers</div>
+            <div><span class="text-weight-bold text-dark">{{ followingCount }}</span> following</div>
           </div>
         </q-card-section>
 
@@ -72,7 +114,34 @@
         <q-card-actions align="center" v-if="isOwnProfile">
           <q-btn color="primary" label="Edit Profile" icon="edit" @click="toggleEditMode" />
         </q-card-actions>
+
+        <!-- Actions for other profiles -->
+        <q-card-actions align="center" v-if="!isOwnProfile && authStore.isLoggedIn">
+          <q-btn
+            :label="isFollowing ? 'Unfollow' : 'Follow'"
+            :color="isFollowing ? 'grey-7' : 'primary'"
+            :outline="isFollowing"
+            unelevated
+            :loading="followLoading"
+            @click="handleFollow"
+          />
+          <q-btn
+            color="deep-purple"
+            icon="chat"
+            label="Message"
+            flat
+            @click="handleMessage"
+          />
+        </q-card-actions>
       </div>
+
+      <!-- Report dialog -->
+      <ReportDialog
+        v-if="profileUser && !isOwnProfile"
+        v-model="reportDialog"
+        :reported-id="profileUser.id"
+        reported-type="user"
+      />
 
       <!-- EDIT MODE -->
       <div v-else>
@@ -170,14 +239,29 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
-import { api } from 'src/boot/axios'
+import { useSafetyStore } from 'src/stores/safetyStore'
+import { useSocialStore } from 'src/stores/socialStore'
 import { useQuasar } from 'quasar'
+import ReportDialog from 'src/components/ReportDialog.vue'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
+const safetyStore = useSafetyStore()
+const socialStore = useSocialStore()
 const $q = useQuasar()
+
+// Follow state is derived from the store's currentUser, which is hydrated
+// straight from the API on every load — never from stale local state.
+const isFollowing = computed(() => socialStore.currentUser?.is_following ?? false)
+const isFriend = computed(() => socialStore.currentUser?.is_friend ?? false)
+const followersCount = computed(() => socialStore.currentUser?.followers_count ?? 0)
+const followingCount = computed(() => socialStore.currentUser?.following_count ?? 0)
+const followLoading = ref(false)
+
+const reportDialog = ref(false)
 
 const loading = ref(true)
 const fetchError = ref('')
@@ -207,6 +291,7 @@ const isOwnProfile = computed(() => {
 
 onMounted(async () => {
   await loadProfile()
+  if (authStore.isLoggedIn) safetyStore.fetchBlockList()
 })
 
 const loadProfile = async () => {
@@ -222,9 +307,8 @@ const loadProfile = async () => {
       return
     }
 
-    // Load user by ID
-    const response = await api.get(`/api/v1/users/${requestedId}`)
-    profileUser.value = response.data.data
+    // Load user by ID through the store so follow state stays in one place
+    profileUser.value = await socialStore.fetchUser(requestedId)
 
   } catch (error) {
     if (error.response?.status === 404) {
@@ -234,6 +318,37 @@ const loadProfile = async () => {
     }
   } finally {
     loading.value = false
+  }
+}
+
+const handleBlock = async () => {
+  try {
+    const result = await safetyStore.toggleBlock(profileUser.value.id)
+    $q.notify({ color: 'info', icon: result.blocked ? 'block' : 'person_add', message: result.message })
+  } catch {
+    $q.notify({ color: 'negative', message: 'Action failed' })
+  }
+}
+
+const handleFollow = async () => {
+  followLoading.value = true
+  try {
+    // The store patches currentUser; isFollowing/followersCount update reactively.
+    const res = await socialStore.followUser(profileUser.value.id)
+    $q.notify({ type: 'positive', message: res.message, position: 'top' })
+  } catch {
+    $q.notify({ type: 'negative', message: 'Action failed', position: 'top' })
+  } finally {
+    followLoading.value = false
+  }
+}
+
+const handleMessage = async () => {
+  try {
+    const conv = await socialStore.startConversation(profileUser.value.id)
+    router.push(`/messages/${conv.id}`)
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e.response?.data?.message || 'Cannot start conversation', position: 'top' })
   }
 }
 

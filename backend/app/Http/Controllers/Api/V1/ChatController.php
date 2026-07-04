@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Events\MessageSent;
 use App\Http\Controllers\Controller;
+use App\Models\BlockedUser;
 use App\Models\GroupChat;
 use App\Models\Message;
 use App\Models\Trip;
@@ -22,9 +23,14 @@ class ChatController extends Controller
             'name'    => $trip->title . ' Chat',
         ]);
 
-        $messages = $chat->messages()
-            ->with('sender')
-            ->latest()
+        $msgQuery = $chat->messages()->with('sender');
+
+        $blockedIds = BlockedUser::relatedIds(auth()->id());
+        if ($blockedIds->isNotEmpty()) {
+            $msgQuery->whereNotIn('sender_id', $blockedIds);
+        }
+
+        $messages = $msgQuery->latest()
             ->limit(50)
             ->get()
             ->reverse()
@@ -73,9 +79,10 @@ class ChatController extends Controller
             'body'       => $msg->body,
             'type'       => $msg->type,
             'sender'     => [
-                'id'     => $msg->sender->id,
-                'name'   => $msg->sender->name,
-                'avatar' => $msg->sender->avatar,
+                'id'          => $msg->sender->id,
+                'name'        => $msg->sender->name,
+                'avatar'      => $msg->sender->avatar,
+                'is_verified' => (bool) $msg->sender->is_verified,
             ],
             'created_at' => $msg->created_at,
             'chat_id'    => $msg->chat_id,

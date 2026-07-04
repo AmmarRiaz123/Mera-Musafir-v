@@ -215,7 +215,7 @@ class AgencyController extends Controller
         $packageIds = $agency->packages()->pluck('id');
 
         $query = Booking::whereIn('agency_package_id', $packageIds)
-            ->with(['user', 'agencyPackage'])
+            ->with(['user', 'agencyPackage.trip'])
             ->latest();
 
         if ($request->status) {

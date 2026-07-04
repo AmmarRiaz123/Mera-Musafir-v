@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Trip\CreateTripRequest;
 use App\Http\Requests\Trip\UpdateTripRequest;
 use App\Http\Resources\TripResource;
+use App\Models\BlockedUser;
 use App\Models\GroupChat;
 use App\Models\Trip;
 use App\Models\TripMember;
@@ -80,6 +81,18 @@ class TripController extends Controller
             $query->where('title', 'like', '%' . $request->search . '%');
         }
 
+        // Public route — resolve the optional Bearer token via the sanctum guard,
+        // then hide trips CREATED by anyone in a block relationship (either
+        // direction). Trips owned by a third party stay visible even if a
+        // blocked user is a co-member.
+        $authUser = auth('sanctum')->user();
+        if ($authUser) {
+            $blockedIds = BlockedUser::relatedIds($authUser->id);
+            if ($blockedIds->isNotEmpty()) {
+                $query->whereNotIn('creator_id', $blockedIds);
+            }
+        }
+
         $trips = $query->latest()->paginate(12);
 
         return TripResource::collection($trips)->additional([
@@ -122,6 +135,13 @@ class TripController extends Controller
     // Get a single trip
     public function show(Trip $trip)
     {
+        // Hide the trip if the viewer and its creator have a block relationship
+        // (either direction). Co-membership in a third party's trip is unaffected.
+        $authUser = auth('sanctum')->user();
+        if ($authUser && BlockedUser::blockExistsBetween($authUser->id, $trip->creator_id)) {
+            return response()->json(['message' => 'Trip not found'], 404);
+        }
+
         $trip->load(['creator', 'destination', 'joinedMembers']);
 
         return response()->json([
@@ -158,6 +178,11 @@ class TripController extends Controller
     public function join(Trip $trip)
     {
         $user = auth()->user();
+
+        // Cannot join a trip created by someone in a block relationship.
+        if (BlockedUser::blockExistsBetween($user->id, $trip->creator_id)) {
+            return response()->json(['message' => 'You cannot join this trip'], 403);
+        }
 
         // Check if trip is full
         if ($trip->isFull()) {
@@ -231,13 +256,14 @@ class TripController extends Controller
         return response()->json([
             'message' => 'Members retrieved successfully',
             'data'    => $trip->members->map(fn($user) => [
-                'id'        => $user->id,
-                'name'      => $user->name,
-                'avatar'    => $user->avatar,
-                'city'      => $user->city,
-                'status'    => $user->pivot->status,
-                'role'      => $user->pivot->role,
-                'joined_at' => $user->pivot->joined_at,
+                'id'          => $user->id,
+                'name'        => $user->name,
+                'avatar'      => $user->avatar,
+                'city'        => $user->city,
+                'is_verified' => (bool) $user->is_verified,
+                'status'      => $user->pivot->status,
+                'role'        => $user->pivot->role,
+                'joined_at'   => $user->pivot->joined_at,
             ]),
         ]);
     }

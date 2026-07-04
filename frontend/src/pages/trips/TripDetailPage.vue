@@ -255,14 +255,46 @@
             class="col-6 col-sm-4 col-md-3"
           >
             <q-card flat bordered class="q-pa-sm row items-center no-wrap">
-              <q-avatar size="36px" class="q-mr-sm">
+              <q-avatar size="36px" class="q-mr-sm cursor-pointer" @click="$router.push(`/profile/${member.id}`)">
                 <img v-if="member.avatar" :src="member.avatar" />
                 <q-icon v-else name="person" />
               </q-avatar>
-              <div class="ellipsis">
-                <div class="text-caption text-weight-bold ellipsis">{{ member.name }}</div>
+              <div class="ellipsis col">
+                <div class="row items-center no-wrap q-gutter-xs">
+                  <span class="text-caption text-weight-bold ellipsis">{{ member.name }}</span>
+                  <q-icon v-if="member.is_verified" name="verified" color="deep-purple" size="12px">
+                    <q-tooltip>Verified User</q-tooltip>
+                  </q-icon>
+                </div>
                 <div class="text-caption text-grey-7 ellipsis" v-if="member.city">{{ member.city }}</div>
               </div>
+              <!-- Three-dot menu for other members -->
+              <q-btn
+                v-if="authStore.user && member.id !== authStore.user.id"
+                flat round dense icon="more_vert" size="xs" color="grey-6"
+              >
+                <q-menu auto-close>
+                  <q-list style="min-width: 160px">
+                    <q-item clickable @click="$router.push(`/profile/${member.id}`)">
+                      <q-item-section avatar><q-icon name="person" size="xs" /></q-item-section>
+                      <q-item-section>View Profile</q-item-section>
+                    </q-item>
+                    <q-item clickable @click="messageMember(member)">
+                      <q-item-section avatar><q-icon name="chat" size="xs" color="deep-purple" /></q-item-section>
+                      <q-item-section>Message</q-item-section>
+                    </q-item>
+                    <q-separator />
+                    <q-item clickable @click="blockMember(member)">
+                      <q-item-section avatar><q-icon name="block" size="xs" color="grey-7" /></q-item-section>
+                      <q-item-section>Block</q-item-section>
+                    </q-item>
+                    <q-item clickable @click="reportMember(member)">
+                      <q-item-section avatar><q-icon name="flag" size="xs" color="negative" /></q-item-section>
+                      <q-item-section class="text-negative">Report</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </q-btn>
             </q-card>
           </div>
         </div>
@@ -292,6 +324,14 @@
       </q-card>
     </q-dialog>
 
+    <!-- Member report dialog -->
+    <ReportDialog
+      v-if="memberReportTarget"
+      v-model="memberReportDialog"
+      :reported-id="memberReportTarget.id"
+      reported-type="user"
+    />
+
     <!-- Leave confirm dialog -->
     <q-dialog v-model="leaveDialog">
       <q-card style="min-width: 300px">
@@ -317,13 +357,21 @@ import { useQuasar } from 'quasar'
 import { useTripStore } from 'src/stores/tripStore'
 import { useAuthStore } from 'src/stores/authStore'
 import { useMatchStore } from 'src/stores/matchStore'
+import { useSocialStore } from 'src/stores/socialStore'
+import { useSafetyStore } from 'src/stores/safetyStore'
+import ReportDialog from 'src/components/ReportDialog.vue'
 
 const route = useRoute()
-const router = useRouter() // eslint-disable-line no-unused-vars
+const router = useRouter()
 const $q = useQuasar()
 const tripStore = useTripStore()
 const authStore = useAuthStore()
 const matchStore = useMatchStore()
+const socialStore = useSocialStore()
+const safetyStore = useSafetyStore()
+
+const memberReportTarget = ref(null)
+const memberReportDialog = ref(false)
 
 const actionLoading = ref(false)
 const leaveDialog = ref(false)
@@ -416,6 +464,29 @@ const formatBudget = (amount) => {
 const statusColor = (status) => {
   const map = { planning: 'orange', active: 'positive', completed: 'grey-6', archived: 'grey-4' }
   return map[status] || 'grey'
+}
+
+const messageMember = async (member) => {
+  try {
+    const conv = await socialStore.startConversation(member.id)
+    router.push(`/messages/${conv.id}`)
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e.response?.data?.message || 'Cannot start conversation', position: 'top' })
+  }
+}
+
+const blockMember = async (member) => {
+  try {
+    const res = await safetyStore.toggleBlock(member.id)
+    $q.notify({ type: 'info', message: res.message, position: 'top' })
+  } catch {
+    $q.notify({ type: 'negative', message: 'Action failed', position: 'top' })
+  }
+}
+
+const reportMember = (member) => {
+  memberReportTarget.value = member
+  memberReportDialog.value = true
 }
 </script>
 

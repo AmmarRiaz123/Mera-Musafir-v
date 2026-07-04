@@ -16,3 +16,8 @@ Broadcast::channel('trip.{tripId}', function ($user, $tripId) {
         ->where('status', 'joined')
         ->exists();
 });
+
+Broadcast::channel('conversation.{conversationId}', function ($user, $conversationId) {
+    $conv = \App\Models\Conversation::find($conversationId);
+    return $conv && ($conv->user_one_id === $user->id || $conv->user_two_id === $user->id);
+});

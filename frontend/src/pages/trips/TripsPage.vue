@@ -138,6 +138,9 @@
                 <q-icon v-else name="person" size="xs" />
               </q-avatar>
               <span class="text-caption">{{ trip.creator.name }}</span>
+              <q-icon v-if="trip.creator.is_verified" name="verified" color="deep-purple" size="12px" class="q-ml-xs">
+                <q-tooltip>Verified User</q-tooltip>
+              </q-icon>
             </div>
             <q-btn flat color="primary" label="View" :to="`/trips/${trip.id}`" dense />
           </q-card-section>

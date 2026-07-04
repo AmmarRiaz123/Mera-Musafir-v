@@ -156,6 +156,15 @@
                   @click="doConfirm(booking)"
                 />
                 <q-btn
+                  v-if="booking.status === 'confirmed' && booking.package?.trip_id"
+                  unelevated
+                  color="primary"
+                  label="View Group"
+                  icon="forum"
+                  size="xs"
+                  :to="`/trips/${booking.package.trip_id}/chat`"
+                />
+                <q-btn
                   v-if="booking.status !== 'cancelled' && booking.status !== 'completed'"
                   outline
                   color="negative"

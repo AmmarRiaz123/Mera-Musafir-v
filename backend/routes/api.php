@@ -3,11 +3,14 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
+use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\DestinationController;
 use App\Http\Controllers\Api\V1\MatchingController;
 use App\Http\Controllers\Api\V1\PackageController;
 use App\Http\Controllers\Api\V1\PlanningController;
+use App\Http\Controllers\Api\V1\SafetyController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\UserController;
 
@@ -22,8 +25,10 @@ Route::prefix('v1')->group(function () {
     Route::get('/destinations',          [DestinationController::class, 'index']);
     Route::get('/destinations/{destination}', [DestinationController::class, 'show']);
 
-    // User profiles (public)
-    Route::get('/users/{user}', [UserController::class, 'show']);
+    // User discovery — exact routes MUST be before /users/{user} wildcard
+    Route::get('/users',         [UserController::class, 'index']);
+    Route::get('/users/blocked', [SafetyController::class, 'blockList'])->middleware('auth:sanctum');
+    Route::get('/users/{user}',  [UserController::class, 'show']);
 
     // Agencies (public) — /agencies/my MUST be before /agencies/{agency}
     Route::get('/agencies/my',          [AgencyController::class, 'myAgency'])->middleware('auth:sanctum');
@@ -55,6 +60,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/agencies/{agency}/analytics',          [AgencyController::class, 'analytics'])->middleware('agency.tier:pro');
         Route::get('/agencies/{agency}/bookings',           [AgencyController::class, 'allBookings']);
 
+        // Bookings — traveler's own bookings (before any wildcard booking routes)
+        Route::get('/bookings/my', [BookingController::class, 'my']);
+
         // Packages
         Route::post('/packages',                                                    [PackageController::class, 'store']);
         Route::put('/packages/{package}',                                           [PackageController::class, 'update']);
@@ -65,7 +73,21 @@ Route::prefix('v1')->group(function () {
         Route::post('/packages/{package}/bookings/{booking}/cancel',                [PackageController::class, 'cancelBooking']);
 
         // Profile
-        Route::put('/users/{user}', [UserController::class, 'update']);
+        Route::put('/users/{user}',         [UserController::class, 'update']);
+
+        // Safety
+        Route::post('/report',              [SafetyController::class, 'report']);
+        Route::post('/users/{user}/block',  [SafetyController::class, 'block']);
+
+        // Social graph
+        Route::post('/users/{user}/follow', [UserController::class, 'follow']);
+
+        // Conversations (DMs)
+        Route::get('/conversations',                                                           [ConversationController::class, 'index']);
+        Route::post('/conversations',                                                          [ConversationController::class, 'start']);
+        Route::get('/conversations/{conversation}',                                            [ConversationController::class, 'show']);
+        Route::post('/conversations/{conversation}/messages',                                  [ConversationController::class, 'send']);
+        Route::post('/conversations/{conversation}/messages/{message}/respond',                [ConversationController::class, 'respondToInvite']);
 
         // Trips
         Route::post('/trips',                              [TripController::class, 'store']);

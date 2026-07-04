@@ -72,11 +72,39 @@
 
         <q-separator class="q-my-sm" />
 
+        <q-item-label header class="text-caption text-grey-6">SOCIAL</q-item-label>
+
+        <q-item clickable v-ripple to="/people">
+          <q-item-section avatar><q-icon name="people" /></q-item-section>
+          <q-item-section>People</q-item-section>
+        </q-item>
+
+        <q-item clickable v-ripple to="/messages">
+          <q-item-section avatar><q-icon name="chat" /></q-item-section>
+          <q-item-section class="row items-center no-wrap">
+            Messages
+            <q-badge
+              v-if="unreadCount > 0"
+              color="deep-purple"
+              :label="unreadCount"
+              rounded
+              class="q-ml-sm"
+            />
+          </q-item-section>
+        </q-item>
+
+        <q-separator class="q-my-sm" />
+
         <q-item-label header class="text-caption text-grey-6">ACCOUNT</q-item-label>
 
         <q-item clickable v-ripple to="/profile">
           <q-item-section avatar><q-icon name="person" /></q-item-section>
           <q-item-section>Profile</q-item-section>
+        </q-item>
+
+        <q-item clickable v-ripple to="/my-bookings">
+          <q-item-section avatar><q-icon name="confirmation_number" /></q-item-section>
+          <q-item-section>My Bookings</q-item-section>
         </q-item>
 
         <q-item clickable v-ripple @click="handleLogout">
@@ -93,14 +121,22 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
+import { useSocialStore } from 'src/stores/socialStore'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const socialStore = useSocialStore()
 
 const drawerOpen = ref(false)
+
+const unreadCount = computed(() => socialStore.totalUnread)
+
+onMounted(() => {
+  if (authStore.user) socialStore.fetchConversations()
+})
 
 const toggleDrawer = () => {
   drawerOpen.value = !drawerOpen.value

@@ -87,7 +87,6 @@ class PlanningController extends Controller
 
     private function calculateSettlement(Trip $trip): array
     {
-        // Aggregate unsettled shares, excluding the payer's own share
         $unsettled = ExpenseShare::whereHas('expense', fn($q) => $q->where('trip_id', $trip->id))
             ->where('is_settled', false)
             ->with(['user', 'expense.paidBy'])
@@ -96,20 +95,61 @@ class PlanningController extends Controller
 
         if ($unsettled->isEmpty()) return [];
 
-        $debts = [];
+        // Step 1: Compute net balance per user across all unsettled shares.
+        // Positive = owed money. Negative = owes money.
+        $balances = [];
+        $names    = [];
+
         foreach ($unsettled as $share) {
-            $key = $share->user_id . '-' . $share->expense->paid_by_id;
-            if (!isset($debts[$key])) {
-                $debts[$key] = [
-                    'from'   => ['id' => $share->user->id, 'name' => $share->user->name],
-                    'to'     => ['id' => $share->expense->paidBy->id, 'name' => $share->expense->paidBy->name],
-                    'amount' => 0,
-                ];
-            }
-            $debts[$key]['amount'] += $share->share_amount;
+            $debtorId   = $share->user_id;
+            $creditorId = $share->expense->paid_by_id;
+
+            // A user cannot owe themselves (defensive; pre-filter above already handles this).
+            if ($debtorId === $creditorId) continue;
+
+            $amount = (float) $share->share_amount;
+
+            $balances[$debtorId]   = ($balances[$debtorId]   ?? 0) - $amount;
+            $balances[$creditorId] = ($balances[$creditorId] ?? 0) + $amount;
+
+            $names[$debtorId]   = $share->user->name;
+            $names[$creditorId] = $share->expense->paidBy->name;
         }
 
-        return array_values($debts);
+        // Step 2: Split into debtors (negative balance) and creditors (positive balance).
+        $debtors   = [];
+        $creditors = [];
+
+        foreach ($balances as $userId => $balance) {
+            if ($balance < -0.01) {
+                $debtors[]   = ['id' => $userId, 'name' => $names[$userId], 'amount' => -$balance];
+            } elseif ($balance > 0.01) {
+                $creditors[] = ['id' => $userId, 'name' => $names[$userId], 'amount' => $balance];
+            }
+        }
+
+        // Step 3: Greedy algorithm — produces the minimum number of transactions needed.
+        $transactions = [];
+        $i = 0;
+        $j = 0;
+
+        while ($i < count($debtors) && $j < count($creditors)) {
+            $pay = min($debtors[$i]['amount'], $creditors[$j]['amount']);
+
+            $transactions[] = [
+                'from'   => ['id' => $debtors[$i]['id'],   'name' => $debtors[$i]['name']],
+                'to'     => ['id' => $creditors[$j]['id'], 'name' => $creditors[$j]['name']],
+                'amount' => (int) round($pay),
+            ];
+
+            $debtors[$i]['amount']   -= $pay;
+            $creditors[$j]['amount'] -= $pay;
+
+            if ($debtors[$i]['amount']   < 0.01) $i++;
+            if ($creditors[$j]['amount'] < 0.01) $j++;
+        }
+
+        return $transactions;
     }
 
     private function formatChecklist(Trip $trip): array

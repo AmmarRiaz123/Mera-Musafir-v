@@ -50,6 +50,11 @@ class AgencyPackage extends Model
         return $this->hasMany(Booking::class);
     }
 
+    public function trip()
+    {
+        return $this->hasOne(Trip::class, 'package_id');
+    }
+
     public function isFull(): bool
     {
         return $this->booked_count >= $this->max_capacity;

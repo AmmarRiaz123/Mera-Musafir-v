@@ -9,6 +9,8 @@ const routes = [
       { path: 'destinations/:slug', component: () => import('pages/destinations/DestinationDetailPage.vue') },
       { path: 'profile', component: () => import('pages/profile/ProfilePage.vue') },
       { path: 'profile/:id', component: () => import('pages/profile/ProfilePage.vue') },
+      { path: 'privacy', component: () => import('pages/profile/PrivacySettingsPage.vue') },
+      { path: 'my-bookings', component: () => import('pages/bookings/MyBookingsPage.vue') },
       { path: 'trips', component: () => import('pages/trips/TripsPage.vue') },
       { path: 'trips/create', component: () => import('pages/trips/CreateTripPage.vue') },
       { path: 'trips/:id', component: () => import('pages/trips/TripDetailPage.vue') },
@@ -28,6 +30,11 @@ const routes = [
       { path: 'packages', component: () => import('pages/packages/PackagesPage.vue') },
       { path: 'packages/create', component: () => import('pages/agencies/CreatePackagePage.vue') },
       { path: 'packages/:slug', component: () => import('pages/packages/PackageDetailPage.vue') },
+
+      // Social
+      { path: 'people', component: () => import('pages/social/PeoplePage.vue') },
+      { path: 'messages', component: () => import('pages/social/MessagesPage.vue') },
+      { path: 'messages/:id', component: () => import('pages/social/DMPage.vue') },
     ],
   },
   {

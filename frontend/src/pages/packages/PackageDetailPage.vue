@@ -29,7 +29,19 @@
         <div class="row q-col-gutter-lg">
           <!-- Main content -->
           <div class="col-12 col-md-8">
-            <div class="text-h4 text-weight-bold q-mb-xs">{{ pkg.title }}</div>
+            <div class="row items-center justify-between q-mb-xs">
+              <div class="text-h4 text-weight-bold">{{ pkg.title }}</div>
+              <q-btn
+                v-if="authStore.isLoggedIn && !isOwnAgency"
+                flat round dense
+                icon="flag"
+                color="grey-5"
+                size="sm"
+                @click="reportDialog = true"
+              >
+                <q-tooltip>Report this package</q-tooltip>
+              </q-btn>
+            </div>
 
             <!-- Agency badge -->
             <div
@@ -159,18 +171,56 @@
                 </div>
               </q-card-section>
 
-              <!-- Existing booking status -->
-              <q-card-section v-if="myBooking" class="q-pt-none">
-                <q-banner rounded class="bg-blue-1">
-                  <template v-slot:avatar><q-icon name="info" color="blue" /></template>
-                  <span class="text-body2">Your booking: </span>
-                  <q-badge :color="bookingStatusColor(myBooking.status)" :label="myBooking.status.toUpperCase()" />
-                </q-banner>
+              <!-- Traveler's booking status -->
+              <q-card-section v-if="myBooking" class="q-pt-none column q-gutter-sm">
+                <!-- Pending -->
+                <q-badge
+                  v-if="myBooking.status === 'pending'"
+                  color="grey-6"
+                  class="q-pa-sm text-body2"
+                  multi-line
+                >
+                  Booking Pending — awaiting agency confirmation
+                </q-badge>
+
+                <!-- Confirmed -->
+                <template v-else-if="myBooking.status === 'confirmed'">
+                  <q-badge color="positive" class="q-pa-sm text-body2" multi-line>
+                    {{ pkg.trip_id ? 'Booking Confirmed' : 'Booking Confirmed — group chat will be available soon' }}
+                  </q-badge>
+                  <q-btn
+                    v-if="pkg.trip_id"
+                    unelevated
+                    color="deep-purple"
+                    icon="forum"
+                    label="Join Group Chat"
+                    class="full-width"
+                    :to="`/trips/${pkg.trip_id}/chat`"
+                  />
+                </template>
+
+                <!-- Cancelled -->
+                <q-badge
+                  v-else-if="myBooking.status === 'cancelled'"
+                  color="negative"
+                  class="q-pa-sm text-body2"
+                >
+                  Booking Cancelled
+                </q-badge>
+
+                <!-- Any other status (e.g. completed) -->
+                <q-badge
+                  v-else
+                  :color="bookingStatusColor(myBooking.status)"
+                  class="q-pa-sm text-body2 capitalize"
+                >
+                  {{ myBooking.status }}
+                </q-badge>
               </q-card-section>
 
               <q-card-actions class="q-px-md q-pb-md">
                 <q-btn
-                  v-if="!myBooking && !pkg.is_full && pkg.status === 'published' && !isOwnAgency"
+                  v-if="!hasActiveBooking && !pkg.is_full && pkg.status === 'published' && !isOwnAgency"
                   unelevated
                   color="deep-purple"
                   label="Book Now"
@@ -199,6 +249,14 @@
         </div>
       </div>
     </template>
+
+    <!-- Report dialog -->
+    <ReportDialog
+      v-if="pkg"
+      v-model="reportDialog"
+      :reported-id="pkg.id"
+      reported-type="package"
+    />
 
     <!-- Book dialog -->
     <q-dialog v-model="showBookDialog" persistent>
@@ -250,6 +308,7 @@ import { useQuasar } from 'quasar'
 import { useAgencyStore } from 'src/stores/agencyStore'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/boot/axios'
+import ReportDialog from 'src/components/ReportDialog.vue'
 
 const route = useRoute()
 const $q = useQuasar()
@@ -260,10 +319,15 @@ const showBookDialog = ref(false)
 const booking = ref(false)
 const myBooking = ref(null)
 const bookForm = reactive({ travelers_count: 1, notes: '' })
+const reportDialog = ref(false)
 
 const pkg = computed(() => store.currentPackage)
 const isOwnAgency = computed(() =>
   pkg.value?.agency?.user?.id === authStore.user?.id
+)
+// A cancelled booking shouldn't block re-booking — only pending/confirmed do.
+const hasActiveBooking = computed(() =>
+  !!myBooking.value && myBooking.value.status !== 'cancelled'
 )
 
 onMounted(async () => {
@@ -272,14 +336,13 @@ onMounted(async () => {
 })
 
 const fetchMyBooking = async () => {
-  if (!pkg.value?.id) return
   try {
-    const r = await api.get(`/api/v1/packages/${route.params.slug}/bookings`, { params: { my: true } })
-    // check if current user has a booking
-    const found = (r.data.data || []).find((b) => b.user?.id === authStore.user?.id)
+    const r = await api.get('/api/v1/bookings/my')
+    // Newest-first from the API — first match for this package is the active one.
+    const found = (r.data.data || []).find((b) => b.package?.slug === route.params.slug)
     myBooking.value = found ?? null
   } catch {
-    // non-owner cannot list bookings — that's fine
+    // not logged in or request failed — leave booking unset
   }
 }
 

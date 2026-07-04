@@ -32,6 +32,7 @@ class PackageResource extends JsonResource
             'views_count'         => $this->views_count,
             'agency'              => new AgencyResource($this->whenLoaded('agency')),
             'destination'         => new DestinationResource($this->whenLoaded('destination')),
+            'trip_id'             => $this->trip?->id,
             'created_at'          => $this->created_at->toDateTimeString(),
         ];
     }

@@ -102,7 +102,18 @@
                 class="bg-grey-3"
               />
               <q-card-section>
-                <div class="text-weight-bold ellipsis">{{ pkg.title }}</div>
+                <div class="row items-start justify-between no-wrap">
+                  <div class="text-weight-bold ellipsis">{{ pkg.title }}</div>
+                  <q-btn
+                    flat round dense
+                    icon="flag"
+                    color="grey-5"
+                    size="xs"
+                    @click.stop="openReport(pkg)"
+                  >
+                    <q-tooltip>Report package</q-tooltip>
+                  </q-btn>
+                </div>
                 <div class="row items-center justify-between q-mt-xs">
                   <span class="text-deep-purple text-weight-bold">{{ pkg.formatted_price }}</span>
                   <span class="text-caption text-grey-6">{{ pkg.duration_days }}D · {{ pkg.spots_left }} left</span>
@@ -115,6 +126,13 @@
             </q-card>
           </div>
         </div>
+
+        <ReportDialog
+          v-if="reportTarget"
+          v-model="reportDialog"
+          :reported-id="reportTarget.id"
+          reported-type="package"
+        />
       </div>
     </template>
   </q-page>
@@ -127,6 +145,7 @@ import { useQuasar } from 'quasar'
 import { useAgencyStore } from 'src/stores/agencyStore'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/boot/axios'
+import ReportDialog from 'src/components/ReportDialog.vue'
 
 const route = useRoute()
 const $q = useQuasar()
@@ -137,6 +156,8 @@ const slug = route.params.slug
 const followLoading = ref(false)
 const packages = ref([])
 const loadingPackages = ref(false)
+const reportDialog = ref(false)
+const reportTarget = ref(null)
 
 const agency = computed(() => store.currentAgency ?? {})
 const isOwner = computed(() => authStore.user?.id && agency.value.user?.id === authStore.user.id)
@@ -167,6 +188,11 @@ const toggleFollow = async () => {
   } finally {
     followLoading.value = false
   }
+}
+
+const openReport = (pkg) => {
+  reportTarget.value = pkg
+  reportDialog.value = true
 }
 
 const tierColor = (t) => ({ basic: 'grey-6', pro: 'blue-7', premium: 'deep-purple' }[t] ?? 'grey')

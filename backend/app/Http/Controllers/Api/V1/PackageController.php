@@ -7,6 +7,9 @@ use App\Http\Resources\BookingResource;
 use App\Http\Resources\PackageResource;
 use App\Models\AgencyPackage;
 use App\Models\Booking;
+use App\Models\GroupChat;
+use App\Models\Trip;
+use App\Models\TripMember;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -257,7 +260,56 @@ class PackageController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $alreadyConfirmed = $booking->status === 'confirmed';
+
         $booking->update(['status' => 'confirmed', 'confirmed_at' => now()]);
+
+        // Spawn (or reuse) the package's group trip so booked travelers get a
+        // group chat + planning tools. Skip re-joining if this was already confirmed.
+        if (!$alreadyConfirmed) {
+            $trip = $package->trip;
+
+            if (!$trip) {
+                $trip = Trip::create([
+                    'creator_id'     => $package->agency->user_id,
+                    'destination_id' => $package->destination_id,
+                    'package_id'     => $package->id,
+                    'title'          => $package->title,
+                    'description'    => $package->description,
+                    'start_date'     => $package->start_date,
+                    'end_date'       => $package->end_date,
+                    'max_travelers'  => $package->max_capacity,
+                    'current_count'  => 0,
+                    'type'           => 'cultural',
+                    'visibility'     => 'invite_only',
+                    'status'         => 'planning',
+                ]);
+
+                // Agency owner becomes the host
+                TripMember::create([
+                    'trip_id'   => $trip->id,
+                    'user_id'   => $package->agency->user_id,
+                    'status'    => 'joined',
+                    'role'      => 'host',
+                    'joined_at' => now(),
+                ]);
+
+                GroupChat::create([
+                    'trip_id' => $trip->id,
+                    'name'    => $package->title . ' Group',
+                ]);
+            }
+
+            // Add the confirmed traveler to the trip (idempotent)
+            $member = TripMember::firstOrCreate(
+                ['trip_id' => $trip->id, 'user_id' => $booking->user_id],
+                ['status' => 'joined', 'role' => 'member', 'joined_at' => now()]
+            );
+
+            if ($member->wasRecentlyCreated) {
+                $trip->increment('current_count');
+            }
+        }
 
         return response()->json([
             'message' => 'Booking confirmed',
@@ -282,6 +334,20 @@ class PackageController extends Controller
 
         $booking->update(['status' => 'cancelled', 'cancelled_at' => now()]);
         $package->decrement('booked_count', $booking->travelers_count);
+
+        // If a group trip exists and this traveler had joined it, remove them.
+        $trip = $package->trip;
+        if ($trip) {
+            $member = TripMember::where('trip_id', $trip->id)
+                ->where('user_id', $booking->user_id)
+                ->where('role', 'member')
+                ->first();
+
+            if ($member && $member->status === 'joined') {
+                $member->delete();
+                $trip->decrement('current_count');
+            }
+        }
 
         return response()->json([
             'message' => 'Booking cancelled',

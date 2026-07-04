@@ -47,14 +47,24 @@
             </q-avatar>
           </div>
 
-          <!-- Others' message -->
-          <div v-else class="row justify-start items-end q-gutter-xs">
+          <!-- Others' message — long-press / right-click for actions -->
+          <div
+            v-else
+            class="row justify-start items-end q-gutter-xs"
+            @contextmenu.prevent="openMsgMenu($event, msg)"
+            @touchstart="startLongPress($event, msg)"
+            @touchend="cancelLongPress"
+            @touchmove="cancelLongPress"
+          >
             <q-avatar size="28px" color="grey-4" text-color="grey-9">
               <img v-if="msg.sender?.avatar" :src="msg.sender.avatar" />
               <span v-else class="text-caption text-weight-bold">{{ initial(msg.sender?.name) }}</span>
             </q-avatar>
             <div class="message-bubble other-bubble">
-              <div class="text-caption text-grey-7 text-weight-bold q-mb-xs">{{ msg.sender?.name }}</div>
+              <div class="text-caption text-grey-7 text-weight-bold q-mb-xs">
+                {{ msg.sender?.name }}
+                <q-icon v-if="msg.sender?.is_verified" name="verified" color="deep-purple" size="10px" />
+              </div>
               <div class="message-body">{{ msg.body }}</div>
               <div class="text-caption q-mt-xs text-grey-5" style="font-size: 10px;">
                 {{ formatTime(msg.created_at) }}
@@ -66,6 +76,20 @@
         <div ref="bottomAnchor" />
       </template>
     </div>
+
+    <!-- Message context menu -->
+    <q-menu v-model="msgMenu.show" :target="msgMenu.target" context-menu>
+      <q-list style="min-width: 180px">
+        <q-item clickable v-close-popup @click="openReportMsg">
+          <q-item-section avatar><q-icon name="flag" color="negative" /></q-item-section>
+          <q-item-section class="text-negative">Report Message</q-item-section>
+        </q-item>
+        <q-item clickable v-close-popup @click="confirmBlockSender">
+          <q-item-section avatar><q-icon name="block" color="grey-7" /></q-item-section>
+          <q-item-section>Block User</q-item-section>
+        </q-item>
+      </q-list>
+    </q-menu>
 
     <!-- Input bar -->
     <div class="input-bar row items-center q-pa-sm q-gutter-xs bg-white shadow-up-2">
@@ -90,6 +114,30 @@
         :disable="!inputText.trim() || sending"
       />
     </div>
+
+    <!-- Report message dialog -->
+    <ReportDialog
+      v-if="msgMenu.activeMsg"
+      v-model="reportMsgDialog"
+      :reported-id="msgMenu.activeMsg.id"
+      reported-type="message"
+    />
+
+    <!-- Block confirmation dialog -->
+    <q-dialog v-model="blockConfirmDialog">
+      <q-card style="min-width: 280px">
+        <q-card-section>
+          <div class="text-h6">Block {{ msgMenu.activeMsg?.sender?.name }}?</div>
+        </q-card-section>
+        <q-card-section class="q-pt-none text-body2 text-grey-8">
+          Their messages will be hidden from you in all trips.
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" v-close-popup />
+          <q-btn unelevated color="negative" label="Block" @click="doBlockSender" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -99,12 +147,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useChatStore } from 'src/stores/chatStore'
 import { useAuthStore } from 'src/stores/authStore'
+import { useSafetyStore } from 'src/stores/safetyStore'
+import ReportDialog from 'src/components/ReportDialog.vue'
 
 const route = useRoute()
 const router = useRouter() // eslint-disable-line no-unused-vars
 const $q = useQuasar()
 const chatStore = useChatStore()
 const authStore = useAuthStore()
+const safetyStore = useSafetyStore()
 
 const tripId = computed(() => route.params.id)
 const tripInitial = computed(() => {
@@ -116,6 +167,14 @@ const inputText = ref('')
 const sending = ref(false)
 const messagesContainer = ref(null)
 const bottomAnchor = ref(null)
+
+// Message context menu state
+const msgMenu = ref({ show: false, target: null, activeMsg: null })
+const reportMsgDialog = ref(false)
+const blockConfirmDialog = ref(false)
+
+// Long-press timer
+let longPressTimer = null
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -134,6 +193,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   chatStore.unsubscribeFromTrip(tripId.value)
+  cancelLongPress()
 })
 
 const sendMsg = async () => {
@@ -148,6 +208,49 @@ const sendMsg = async () => {
     $q.notify({ color: 'negative', message: msg, icon: 'error' })
   } finally {
     sending.value = false
+  }
+}
+
+// Right-click (desktop)
+const openMsgMenu = (event, msg) => {
+  msgMenu.value.target = event.target
+  msgMenu.value.activeMsg = msg
+  msgMenu.value.show = true
+}
+
+// Long-press (mobile)
+const startLongPress = (event, msg) => {
+  longPressTimer = setTimeout(() => {
+    msgMenu.value.target = event.target
+    msgMenu.value.activeMsg = msg
+    msgMenu.value.show = true
+  }, 500)
+}
+
+const cancelLongPress = () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+}
+
+const openReportMsg = () => {
+  reportMsgDialog.value = true
+}
+
+const confirmBlockSender = () => {
+  blockConfirmDialog.value = true
+}
+
+const doBlockSender = async () => {
+  blockConfirmDialog.value = false
+  const senderId = msgMenu.value.activeMsg?.sender?.id
+  if (!senderId) return
+  try {
+    const result = await safetyStore.toggleBlock(senderId)
+    $q.notify({ color: 'info', icon: 'block', message: result.message })
+  } catch {
+    $q.notify({ color: 'negative', message: 'Failed to block user' })
   }
 }
 
@@ -187,6 +290,7 @@ const formatTime = (dateStr) => {
   border-radius: 12px;
   padding: 8px 12px;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .own-bubble {

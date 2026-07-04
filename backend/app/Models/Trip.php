@@ -13,6 +13,7 @@ class Trip extends Model
     protected $fillable = [
         'creator_id',
         'destination_id',
+        'package_id',
         'title',
         'description',
         'cover_image',
@@ -46,6 +47,12 @@ class Trip extends Model
     public function destination()
     {
         return $this->belongsTo(Destination::class);
+    }
+
+    // A trip may originate from an agency package booking
+    public function package()
+    {
+        return $this->belongsTo(AgencyPackage::class);
     }
 
     // A trip has many members through trip_members
