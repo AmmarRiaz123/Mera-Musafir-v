@@ -184,6 +184,11 @@
             <q-item-section side><q-icon name="open_in_new" size="14px" color="grey-5" /></q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/community">
+            <q-item-section avatar><q-icon name="forum" /></q-item-section>
+            <q-item-section>Community</q-item-section>
+          </q-item>
+
           <q-separator class="q-my-sm" />
         </template>
 
@@ -236,6 +241,11 @@
           <q-separator class="q-my-sm" />
 
           <q-item-label header class="text-caption text-grey-6">SOCIAL</q-item-label>
+
+          <q-item clickable v-ripple to="/community">
+            <q-item-section avatar><q-icon name="forum" /></q-item-section>
+            <q-item-section>Community</q-item-section>
+          </q-item>
 
           <q-item clickable v-ripple to="/people">
             <q-item-section avatar><q-icon name="people" /></q-item-section>

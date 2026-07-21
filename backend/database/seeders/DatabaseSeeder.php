@@ -53,6 +53,8 @@ class DatabaseSeeder extends Seeder
             DestinationSeeder::class,
             TestUsersSeeder::class,
             AgencySeeder::class,
+            ImageSeeder::class,
+            CommunityPostSeeder::class,
         ]);
     }
 }

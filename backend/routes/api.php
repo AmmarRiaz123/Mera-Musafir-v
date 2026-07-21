@@ -5,12 +5,14 @@ use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
+use App\Http\Controllers\Api\V1\CommunityPostController;
 use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\DestinationController;
 use App\Http\Controllers\Api\V1\MatchingController;
 use App\Http\Controllers\Api\V1\MessageRequestController;
 use App\Http\Controllers\Api\V1\PackageController;
 use App\Http\Controllers\Api\V1\PlanningController;
+use App\Http\Controllers\Api\V1\PostCommentController;
 use App\Http\Controllers\Api\V1\SafetyController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\UploadController;
@@ -41,6 +43,11 @@ Route::prefix('v1')->group(function () {
     Route::get('/packages/my',          [PackageController::class, 'myPackages'])->middleware('auth:sanctum');
     Route::get('/packages',             [PackageController::class, 'index']);
     Route::get('/packages/{package}',   [PackageController::class, 'show']);
+
+    // Community feed (public browsing)
+    Route::get('/community/posts',                  [CommunityPostController::class, 'index']);
+    Route::get('/community/posts/{post}',           [CommunityPostController::class, 'show']);
+    Route::get('/community/posts/{post}/comments',  [PostCommentController::class, 'index']);
 
     // Trips (public browsing)
     Route::get('/trips',       [TripController::class, 'index']);
@@ -99,6 +106,14 @@ Route::prefix('v1')->group(function () {
         Route::post('/message-requests',                    [MessageRequestController::class, 'store']);
         Route::post('/message-requests/{messageRequest}/accept', [MessageRequestController::class, 'accept']);
         Route::delete('/message-requests/{messageRequest}', [MessageRequestController::class, 'dismiss']);
+
+        // Community feed
+        Route::post('/community/posts',                            [CommunityPostController::class, 'store']);
+        Route::put('/community/posts/{post}',                      [CommunityPostController::class, 'update']);
+        Route::delete('/community/posts/{post}',                   [CommunityPostController::class, 'destroy']);
+        Route::post('/community/posts/{post}/like',                [CommunityPostController::class, 'toggleLike']);
+        Route::post('/community/posts/{post}/comments',            [PostCommentController::class, 'store']);
+        Route::delete('/community/posts/{post}/comments/{comment}', [PostCommentController::class, 'destroy']);
 
         // Trips
         Route::post('/trips',                              [TripController::class, 'store']);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\AgencyPackage;
+use App\Models\CommunityPost;
 use App\Models\BlockedUser;
 use App\Models\Message;
 use App\Models\Report;
@@ -18,7 +19,7 @@ class SafetyController extends Controller
     {
         $validated = $request->validate([
             'reported_id'   => 'required|integer',
-            'reported_type' => 'required|in:user,message,package',
+            'reported_type' => 'required|in:user,message,package,post',
             'reason'        => 'required|in:spam,harassment,inappropriate_content,fake_profile,scam,other',
             'description'   => 'nullable|string|max:500',
         ]);
@@ -27,6 +28,7 @@ class SafetyController extends Controller
             'user'    => User::class,
             'message' => Message::class,
             'package' => AgencyPackage::class,
+            'post'    => CommunityPost::class,
         ];
 
         $reportedType = $typeMap[$validated['reported_type']];

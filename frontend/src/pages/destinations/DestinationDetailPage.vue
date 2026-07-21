@@ -21,7 +21,8 @@
       />
 
       <q-img
-        :src="destination.cover_image || 'https://via.placeholder.com/1200x500?text=No+Image'"
+        :src="destination.cover_image"
+        v-if="destination.cover_image"
         ratio="2.4"
         class="rounded-borders shadow-2 q-mb-lg bg-grey-3"
       />
@@ -149,6 +150,37 @@
           </div>
         </div>
       </div>
+
+      <!-- Community posts about this destination -->
+      <div class="q-mt-xl">
+        <div class="text-h6 text-weight-bold">From the community</div>
+        <div class="text-caption text-grey-6 q-mb-md">
+          Stories and tips travellers shared about {{ destination.name }}
+        </div>
+
+        <div v-if="postsLoading" class="row justify-center q-py-lg">
+          <q-spinner-dots color="primary" size="28px" />
+        </div>
+
+        <div v-else-if="!posts.length" class="dest-empty">
+          <q-icon name="forum" size="30px" />
+          <div>No posts about {{ destination.name }} yet.</div>
+          <q-btn flat no-caps dense color="primary" label="Share the first one" to="/community" />
+        </div>
+
+        <div v-else class="column q-gutter-md">
+          <PostCard
+            v-for="post in posts"
+            :key="post.id"
+            :post="post"
+            :comments="communityStore.comments[post.id] || []"
+            :show-comments="openComments.has(post.id)"
+            @like="onLike"
+            @toggle-comments="onToggleComments"
+            @comment="onComment"
+          />
+        </div>
+      </div>
     </div>
   </q-page>
 </template>
@@ -157,7 +189,9 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDestinationStore } from 'src/stores/destinationStore'
+import { useCommunityStore } from 'src/stores/communityStore'
 import { api } from 'src/boot/axios'
+import PostCard from 'components/PostCard.vue'
 
 const route = useRoute()
 const router = useRouter() // eslint-disable-line no-unused-vars
@@ -168,6 +202,37 @@ const destination = computed(() => destinationStore.currentDestination)
 const packages = ref([])
 const pkgLoading = ref(false)
 
+const communityStore = useCommunityStore()
+const posts = ref([])
+const postsLoading = ref(false)
+const openComments = ref(new Set())
+
+// This page shows only posts tagged with this destination.
+const loadPosts = async (destinationId) => {
+  postsLoading.value = true
+  try {
+    const r = await api.get('/api/v1/community/posts', {
+      params: { destination_id: destinationId, per_page: 5 },
+    })
+    posts.value = r.data.data || []
+  } catch {
+    posts.value = []
+  } finally {
+    postsLoading.value = false
+  }
+}
+
+const onLike = (post) => communityStore.toggleLike(post).catch(() => {})
+
+const onToggleComments = async (post) => {
+  const set = new Set(openComments.value)
+  set.has(post.id) ? set.delete(post.id) : set.add(post.id)
+  openComments.value = set
+  if (!communityStore.comments[post.id]) await communityStore.fetchComments(post.id)
+}
+
+const onComment = (post, body) => communityStore.addComment(post, body).catch(() => {})
+
 onMounted(async () => {
   const slug = route.params.slug
   if (slug) {
@@ -175,6 +240,7 @@ onMounted(async () => {
       await destinationStore.fetchDestination(slug)
       if (destination.value?.id) {
         loadPackages(destination.value.id)
+        loadPosts(destination.value.id)
       }
     } catch (e) {
       console.error(e)
@@ -201,6 +267,11 @@ const fmtDate = (d) => {
 </script>
 
 <style scoped>
+.dest-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 32px 16px; border: 1px solid #ece6f0; border-radius: 13px;
+  background: #fff; color: #b0a3b8; font-size: 13px; text-align: center;
+}
 .capitalize { text-transform: capitalize; }
 .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
 .card-hover:hover { transform: translateY(-4px); box-shadow: 0 4px 15px rgba(0,0,0,.1); }

@@ -33,6 +33,7 @@ const routes = [
 
       // Social
       { path: 'people', component: () => import('pages/social/PeoplePage.vue') },
+      { path: 'community', component: () => import('pages/community/CommunityPage.vue') },
       { path: 'messages', component: () => import('pages/social/MessagesPage.vue') },
       { path: 'messages/:id', component: () => import('pages/social/DMPage.vue') },
     ],
