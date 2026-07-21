@@ -15,6 +15,7 @@ class CreateTripRequest extends FormRequest
     {
         return [
             'title'          => 'required|string|max:150',
+            'cover_image'    => 'nullable|string|max:2048',
             'destination_id' => 'required|exists:destinations,id',
             'description'    => 'nullable|string|max:2000',
             'start_date'     => 'required|date|after_or_equal:today',

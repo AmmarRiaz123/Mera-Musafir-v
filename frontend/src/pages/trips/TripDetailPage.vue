@@ -246,28 +246,50 @@
       <div v-if="trip.members && trip.members.length">
         <div class="text-h6 q-mb-md">
           Members
-          <q-badge color="primary" class="q-ml-sm">{{ trip.members.length }}</q-badge>
+          <!-- Seats, so this reconciles with "x/y filled" above -->
+          <q-badge color="primary" class="q-ml-sm">{{ trip.members_count }}</q-badge>
         </div>
         <div class="row q-col-gutter-sm">
           <div
-            v-for="member in trip.members"
+            v-for="member in sortedMembers"
             :key="member.id"
             class="col-6 col-sm-4 col-md-3"
           >
-            <q-card flat bordered class="q-pa-sm row items-center no-wrap">
-              <q-avatar size="36px" class="q-mr-sm cursor-pointer" @click="$router.push(`/profile/${member.id}`)">
-                <img v-if="member.avatar" :src="member.avatar" />
-                <q-icon v-else name="person" />
-              </q-avatar>
-              <div class="ellipsis col">
-                <div class="row items-center no-wrap q-gutter-xs">
-                  <span class="text-caption text-weight-bold ellipsis">{{ member.name }}</span>
-                  <q-icon v-if="member.is_verified" name="verified" color="deep-purple" size="12px">
-                    <q-tooltip>Verified User</q-tooltip>
-                  </q-icon>
+            <q-card flat class="member-card" :class="`member-card--${kindOf(member)}`">
+              <span class="member-ribbon">{{ kindLabel(member) }}</span>
+
+              <div class="row items-center no-wrap">
+                <q-avatar
+                  size="38px"
+                  class="q-mr-sm cursor-pointer member-avatar"
+                  :class="`member-avatar--${kindOf(member)}`"
+                  @click="$router.push(`/profile/${member.id}`)"
+                >
+                  <img v-if="member.avatar" :src="member.avatar" />
+                  <q-icon v-else :name="kindIcon(member)" size="19px" />
+                </q-avatar>
+
+                <div class="ellipsis col">
+                  <div class="row items-center no-wrap q-gutter-xs">
+                    <span class="text-caption text-weight-bold ellipsis">{{ member.name }}</span>
+                    <q-icon v-if="member.is_verified" name="verified" color="deep-purple" size="12px">
+                      <q-tooltip>Verified</q-tooltip>
+                    </q-icon>
+                  </div>
+
+                  <div v-if="member.guests" class="party-tag">
+                    <q-icon name="group" size="11px" />
+                    +{{ member.guests }} {{ member.guests === 1 ? 'guest' : 'guests' }}
+                    <q-tooltip>Booked {{ member.party_size }} seats</q-tooltip>
+                  </div>
+                  <div v-else-if="member.is_agency" class="text-caption text-grey-7 ellipsis">
+                    Trip operator
+                  </div>
+                  <div v-else-if="member.city" class="text-caption text-grey-7 ellipsis">
+                    {{ member.city }}
+                  </div>
+                  <div v-else class="text-caption text-grey-5 ellipsis">Travelling solo</div>
                 </div>
-                <div class="text-caption text-grey-7 ellipsis" v-if="member.city">{{ member.city }}</div>
-              </div>
               <!-- Three-dot menu for other members -->
               <q-btn
                 v-if="authStore.user && member.id !== authStore.user.id"
@@ -285,8 +307,16 @@
                     </q-item>
                     <q-separator />
                     <q-item clickable @click="blockMember(member)">
-                      <q-item-section avatar><q-icon name="block" size="xs" color="grey-7" /></q-item-section>
-                      <q-item-section>Block</q-item-section>
+                      <q-item-section avatar>
+                        <q-icon
+                          :name="safetyStore.isBlocked(member.id) ? 'person_add' : 'block'"
+                          size="xs"
+                          color="grey-7"
+                        />
+                      </q-item-section>
+                      <q-item-section>
+                        {{ safetyStore.isBlocked(member.id) ? 'Unblock' : 'Block' }}
+                      </q-item-section>
                     </q-item>
                     <q-item clickable @click="reportMember(member)">
                       <q-item-section avatar><q-icon name="flag" size="xs" color="negative" /></q-item-section>
@@ -295,6 +325,7 @@
                   </q-list>
                 </q-menu>
               </q-btn>
+              </div>
             </q-card>
           </div>
         </div>
@@ -351,7 +382,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useTripStore } from 'src/stores/tripStore'
@@ -359,6 +390,8 @@ import { useAuthStore } from 'src/stores/authStore'
 import { useMatchStore } from 'src/stores/matchStore'
 import { useSocialStore } from 'src/stores/socialStore'
 import { useSafetyStore } from 'src/stores/safetyStore'
+import { useNotificationStore } from 'src/stores/notificationStore'
+import { notifyError } from 'src/utils/notify'
 import ReportDialog from 'src/components/ReportDialog.vue'
 
 const route = useRoute()
@@ -369,6 +402,7 @@ const authStore = useAuthStore()
 const matchStore = useMatchStore()
 const socialStore = useSocialStore()
 const safetyStore = useSafetyStore()
+const notificationStore = useNotificationStore()
 
 const memberReportTarget = ref(null)
 const memberReportDialog = ref(false)
@@ -390,19 +424,27 @@ const isJoined = computed(() => {
   return trip.value.members?.some(m => m.id === authStore.user.id)
 })
 
-onMounted(async () => {
-  const id = route.params.id
-  if (id) {
-    try {
-      await tripStore.fetchTrip(id)
-      if (isHost.value) {
-        matchStore.fetchSuggestedTravelers(id)
-      }
-    } catch {
-      // handled in template via trip === null
+const loadTrip = async (id) => {
+  if (!id) return
+  try {
+    await tripStore.fetchTrip(id)
+    if (isHost.value) {
+      matchStore.fetchSuggestedTravelers(id)
     }
+  } catch {
+    // handled in template via trip === null
   }
+}
+
+onMounted(() => {
+  // Needed so the member menu can show Block vs Unblock correctly.
+  if (authStore.isLoggedIn) safetyStore.fetchBlockList()
+  loadTrip(route.params.id)
 })
+
+// Vue reuses this component when only the id changes, so onMounted won't
+// fire again — without this, trip → trip navigation shows the previous trip.
+watch(() => route.params.id, (id) => loadTrip(id))
 
 const handleJoin = async () => {
   actionLoading.value = true
@@ -410,8 +452,7 @@ const handleJoin = async () => {
     const result = await tripStore.joinTrip(trip.value.id)
     $q.notify({ color: 'positive', message: result.message, icon: 'check_circle' })
   } catch (err) {
-    const msg = err.response?.data?.message || 'Could not join trip'
-    $q.notify({ color: 'negative', message: msg, icon: 'error' })
+    notifyError($q, err, 'Could not join trip')
   } finally {
     actionLoading.value = false
   }
@@ -428,8 +469,7 @@ const doLeave = async () => {
     leaveDialog.value = false
     $q.notify({ color: 'info', message: result.message, icon: 'info' })
   } catch (err) {
-    const msg = err.response?.data?.message || 'Could not leave trip'
-    $q.notify({ color: 'negative', message: msg, icon: 'error' })
+    notifyError($q, err, 'Could not leave trip')
   } finally {
     actionLoading.value = false
   }
@@ -461,6 +501,23 @@ const formatBudget = (amount) => {
   return Number(amount).toLocaleString()
 }
 
+// Member cards come in three flavours so the roster reads at a glance:
+// the operator/host, parties who booked several seats, and solo travellers.
+const kindOf = (m) => {
+  if (m.is_agency) return 'agency'
+  if (m.role === 'host') return 'host'
+  if (m.guests > 0) return 'party'
+  return 'solo'
+}
+const kindLabel = (m) => ({ agency: 'Operator', host: 'Host', party: 'Group', solo: 'Solo' }[kindOf(m)])
+const kindIcon = (m) => ({ agency: 'storefront', host: 'star', party: 'groups', solo: 'person' }[kindOf(m)])
+
+// Operator/host first, then groups, then solo travellers.
+const rank = { agency: 0, host: 1, party: 2, solo: 3 }
+const sortedMembers = computed(() =>
+  [...(trip.value?.members ?? [])].sort((a, b) => rank[kindOf(a)] - rank[kindOf(b)]),
+)
+
 const statusColor = (status) => {
   const map = { planning: 'orange', active: 'positive', completed: 'grey-6', archived: 'grey-4' }
   return map[status] || 'grey'
@@ -471,13 +528,18 @@ const messageMember = async (member) => {
     const conv = await socialStore.startConversation(member.id)
     router.push(`/messages/${conv.id}`)
   } catch (e) {
-    $q.notify({ type: 'negative', message: e.response?.data?.message || 'Cannot start conversation', position: 'top' })
+    const data = e.response?.data
+    if (data?.requested) {
+      notificationStore.promptRequest({ id: member.id, name: member.name, avatar: member.avatar })
+    } else {
+      $q.notify({ type: 'negative', message: data?.message || 'Cannot start conversation', position: 'top' })
+    }
   }
 }
 
 const blockMember = async (member) => {
   try {
-    const res = await safetyStore.toggleBlock(member.id)
+    const res = await safetyStore.toggleBlock(member.id, member)
     $q.notify({ type: 'info', message: res.message, position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: 'Action failed', position: 'top' })
@@ -493,4 +555,64 @@ const reportMember = (member) => {
 <style scoped>
 .capitalize { text-transform: capitalize; }
 .bg-purple-1 { background: #f3e5f5; }
+
+/* ── Member cards: operator / host / group / solo ───────── */
+.member-card {
+  position: relative;
+  padding: 10px 10px 10px 12px;
+  border-radius: 11px;
+  border: 1px solid #e8e0ee;
+  border-left-width: 3px;
+  background: #fff;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.member-card:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(43, 27, 51, 0.08); }
+
+.member-ribbon {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 1px 7px 2px;
+  border-bottom-left-radius: 8px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Operator — the agency running a package departure */
+.member-card--agency { border-left-color: #4a148c; background: linear-gradient(100deg, #f6f0fa 0%, #fff 60%); }
+.member-card--agency .member-ribbon { background: #4a148c; color: #fff; }
+.member-avatar--agency { background: #4a148c; color: #fff; }
+
+/* Host — the traveller who created the trip */
+.member-card--host { border-left-color: #ef6c00; background: linear-gradient(100deg, #fff6ec 0%, #fff 60%); }
+.member-card--host .member-ribbon { background: #ef6c00; color: #fff; }
+.member-avatar--host { background: #ffe0b2; color: #e65100; }
+
+/* Group — one account holding several seats */
+.member-card--party { border-left-color: #7b1fa2; background: linear-gradient(100deg, #faf3fd 0%, #fff 60%); }
+.member-card--party .member-ribbon { background: #ede0f4; color: #6a3d7d; }
+.member-avatar--party { background: #ede0f4; color: #6a3d7d; }
+
+/* Solo — the quiet default */
+.member-card--solo { border-left-color: #d9cfe2; }
+.member-card--solo .member-ribbon { background: #f4f0f7; color: #9b8aa5; }
+.member-avatar--solo { background: #f2eef5; color: #8a7a92; }
+
+/* One account can hold several seats on a package departure. */
+.party-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #f3e9f8;
+  color: #6a3d7d;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 </style>

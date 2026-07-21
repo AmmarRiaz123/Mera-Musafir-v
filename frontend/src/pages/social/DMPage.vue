@@ -48,6 +48,13 @@
                 <div class="row items-center q-gutter-xs q-mb-xs">
                   <q-icon name="card_travel" color="deep-purple" />
                   <span class="text-caption text-grey-6">Trip Invite</span>
+                  <q-badge
+                    v-if="msg.metadata?.visibility === 'women_only'"
+                    class="women-only-badge"
+                    align="middle"
+                  >
+                    <q-icon name="female" size="12px" class="q-mr-xs" />Women Only
+                  </q-badge>
                 </div>
                 <div class="text-subtitle2 text-weight-bold">{{ msg.metadata?.trip_title }}</div>
                 <div class="text-caption text-grey-6">
@@ -67,10 +74,35 @@
                 />
               </q-card-section>
 
-              <!-- Accept / Decline (recipient only, pending only) -->
-              <q-card-actions v-if="!isMine(msg) && msg.metadata?.status === 'pending'" align="right">
+              <!-- Not eligible: women-only trip, and this account isn't a woman -->
+              <q-card-section
+                v-if="!isMine(msg) && msg.metadata?.status === 'pending' && !canJoinInvite(msg)"
+                class="q-pt-none"
+              >
+                <div class="women-only-note">
+                  <q-icon name="favorite" size="14px" class="q-mr-xs" />
+                  <span>
+                    This trip is just for women travellers — you can't join this one, but you can
+                    cheer them on.
+                  </span>
+                </div>
+              </q-card-section>
+
+              <!-- Accept / Decline (eligible recipient, pending only) -->
+              <q-card-actions
+                v-if="!isMine(msg) && msg.metadata?.status === 'pending' && canJoinInvite(msg)"
+                align="right"
+              >
                 <q-btn flat dense color="negative" label="Decline" @click="respond(msg, 'decline')" />
                 <q-btn unelevated dense color="primary" label="Accept" @click="respond(msg, 'accept')" />
+              </q-card-actions>
+
+              <!-- Ineligible users can still decline to clear it -->
+              <q-card-actions
+                v-else-if="!isMine(msg) && msg.metadata?.status === 'pending'"
+                align="right"
+              >
+                <q-btn flat dense color="grey-7" label="Dismiss" @click="respond(msg, 'decline')" />
               </q-card-actions>
             </q-card>
             <div class="text-caption text-grey-5 q-mt-xs" :class="isMine(msg) ? 'text-right' : 'text-left'">
@@ -114,28 +146,42 @@
     </div>
 
     <!-- Normal input bar -->
-    <div v-else class="row items-center q-pa-sm bg-white shadow-up-2">
-      <q-input
-        v-model="newMessage"
-        outlined
-        dense
-        rounded
-        class="col q-mr-sm"
-        placeholder="Type a message..."
-        @keyup.enter="sendMsg"
-        autogrow
-        :rows="1"
-        style="max-height: 120px; overflow-y: auto"
-      />
-      <q-btn
-        round
-        unelevated
-        color="primary"
-        icon="send"
-        :loading="sending"
-        @click="sendMsg"
-        :disable="!newMessage.trim()"
-      />
+    <div v-else class="bg-white shadow-up-2">
+      <transition name="limit-fade">
+        <div v-if="atLimit" class="limit-banner row items-center no-wrap">
+          <q-icon name="info" size="16px" class="q-mr-xs" />
+          <span>
+            You've reached the <strong>{{ MESSAGE_MAX.toLocaleString() }}</strong>-character limit.
+            Send this and continue in a new message.
+          </span>
+        </div>
+      </transition>
+
+      <div class="row items-center q-pa-sm">
+        <q-input
+          v-model="newMessage"
+          outlined
+          dense
+          rounded
+          class="col q-mr-sm"
+          placeholder="Type a message..."
+          @keyup.enter="sendMsg"
+          @paste="onPaste"
+          :maxlength="MESSAGE_MAX"
+          autogrow
+          :rows="1"
+          style="max-height: 120px; overflow-y: auto"
+        />
+        <q-btn
+          round
+          unelevated
+          color="primary"
+          icon="send"
+          :loading="sending"
+          @click="sendMsg"
+          :disable="!newMessage.trim()"
+        />
+      </div>
     </div>
 
     <!-- Trip invite dialog -->
@@ -174,6 +220,8 @@ import { api } from 'src/boot/axios'
 import { useSocialStore } from 'src/stores/socialStore'
 import { useSafetyStore } from 'src/stores/safetyStore'
 import { useAuthStore } from 'src/stores/authStore'
+import { MESSAGE_MAX, clampMessage, overflowFromPaste, notifyTrimmed } from 'src/utils/messageLimit'
+import { notifyError } from 'src/utils/notify'
 
 const route = useRoute()
 const router = useRouter()
@@ -190,6 +238,29 @@ const selectedTrip = ref(null)
 const myTrips = ref([])
 const privacyError = ref('')
 const unblocking = ref(false)
+
+const atLimit = computed(() => newMessage.value.length >= MESSAGE_MAX)
+
+// Women-only trips can only be joined by women — mirrors the backend guard so
+// we never show an Accept button that is guaranteed to fail.
+const canJoinInvite = (msg) => {
+  if (msg.metadata?.visibility !== 'women_only') return true
+  return authStore.user?.gender === 'female'
+}
+
+// Native maxlength truncates the paste; we only tell the user what was lost.
+const onPaste = (e) => {
+  const pasted = e.clipboardData?.getData('text') ?? ''
+  const el = e.target
+  const selectionLength = (el?.selectionEnd ?? 0) - (el?.selectionStart ?? 0)
+  const removed = overflowFromPaste(pasted, newMessage.value.length, selectionLength)
+  if (removed > 0) notifyTrimmed($q, removed)
+}
+
+// Defensive: keep the model within the limit even if set programmatically.
+watch(newMessage, (val) => {
+  if (val && val.length > MESSAGE_MAX) newMessage.value = clampMessage(val)
+})
 
 const conversationId = computed(() => parseInt(route.params.id))
 const conv = computed(() => socialStore.activeConversation)
@@ -227,8 +298,29 @@ const sendMsg = async () => {
       privacyError.value = e.response?.data?.message || 'You can no longer message this user'
       // A block may have happened since load — refresh so the right bar shows.
       socialStore.fetchConversation(conversationId.value)
+    } else if (e.response?.status === 422) {
+      // Validation (e.g. length) — say exactly what's wrong.
+      $q.notify({
+        icon: 'rule',
+        color: 'amber-8',
+        textColor: 'white',
+        message: 'Message not sent',
+        caption:
+          e.response?.data?.errors?.body?.[0] ||
+          e.response?.data?.message ||
+          `Messages are limited to ${MESSAGE_MAX.toLocaleString()} characters.`,
+        position: 'top',
+        timeout: 5000,
+      })
     } else {
-      $q.notify({ type: 'negative', message: 'Failed to send message', position: 'top' })
+      $q.notify({
+        icon: 'wifi_off',
+        color: 'negative',
+        message: 'Message not sent',
+        caption: e.response?.data?.message || 'Check your connection and try again.',
+        position: 'top',
+        timeout: 5000,
+      })
     }
   } finally {
     sending.value = false
@@ -255,7 +347,7 @@ const respond = async (msg, action) => {
     const res = await socialStore.respondToInvite(conversationId.value, msg.id, action)
     $q.notify({ type: 'positive', message: res.message, position: 'top' })
   } catch (e) {
-    $q.notify({ type: 'negative', message: e.response?.data?.message || 'Failed', position: 'top' })
+    notifyError($q, e, 'Could not respond to the invite')
   }
 }
 
@@ -270,11 +362,7 @@ const sendInvite = async () => {
     $q.notify({ type: 'positive', message: 'Trip invite sent!', position: 'top' })
     scrollToBottom()
   } catch (e) {
-    $q.notify({
-      type: 'negative',
-      message: e.response?.data?.message || 'Failed to send invite',
-      position: 'top',
-    })
+    notifyError($q, e, 'Failed to send invite')
   }
 }
 
@@ -300,11 +388,21 @@ onMounted(async () => {
   socialStore.subscribeToConversation(conversationId.value)
   scrollToBottom()
 
-  // Fetch user's joined trips for invite dialog
+  // Trips the user can invite someone to. /trips/my returns
+  // { created: [...], joined: [...] } — both qualify, since the creator is
+  // stored as a 'joined' host member, which is what the invite endpoint checks.
   try {
     const res = await api.get('/api/v1/trips/my')
-    myTrips.value = (res.data.data || []).filter((t) => t.status === 'joined' || t.role === 'host')
-  } catch { /* non-critical — trip list is optional for invite dialog */ }
+    const { created = [], joined = [] } = res.data.data || {}
+    const seen = new Set()
+    myTrips.value = [...created, ...joined].filter((t) => {
+      if (!t || seen.has(t.id)) return false
+      seen.add(t.id)
+      return true
+    })
+  } catch (e) {
+    console.error('Could not load trips for invite dialog', e)
+  }
 })
 
 onUnmounted(() => {
@@ -321,4 +419,45 @@ onUnmounted(() => {
   font-size: 14px;
   box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
 }
+
+/* Women-only trip accents */
+.women-only-badge {
+  background: linear-gradient(135deg, #d81b60 0%, #8e24aa 100%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.women-only-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fce4ec 0%, #f3e5f5 100%);
+  border: 1px solid #f8bbd0;
+  color: #880e4f;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.women-only-note .q-icon { color: #d81b60; margin-top: 2px; }
+
+/* Shown only once the character cap is actually reached. */
+.limit-banner {
+  padding: 8px 16px;
+  background: linear-gradient(90deg, #f3e5f5 0%, #ede7f6 100%);
+  color: #5e35b1;
+  font-size: 12.5px;
+  line-height: 1.35;
+  border-bottom: 1px solid rgba(94, 53, 177, 0.15);
+}
+.limit-banner strong { font-weight: 600; }
+
+.limit-fade-enter-active,
+.limit-fade-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.limit-fade-enter-from,
+.limit-fade-leave-to { opacity: 0; transform: translateY(4px); }
 </style>

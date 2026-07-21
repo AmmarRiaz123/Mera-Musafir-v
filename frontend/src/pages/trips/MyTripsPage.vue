@@ -14,6 +14,7 @@
     >
       <q-tab name="created" icon="star" label="Created by Me" />
       <q-tab name="joined" icon="group" label="Trips I Joined" />
+      <q-tab name="packages" icon="card_travel" label="My Packages" />
     </q-tabs>
 
     <div v-if="tripStore.loading" class="row q-col-gutter-md">
@@ -134,16 +135,89 @@
           </div>
         </div>
       </q-tab-panel>
+
+      <!-- Packages I've booked -->
+      <q-tab-panel name="packages" class="q-pa-none">
+        <div v-if="bookingsLoading" class="column q-gutter-md">
+          <q-card v-for="n in 3" :key="n" flat bordered class="q-pa-md">
+            <q-skeleton type="text" width="45%" />
+            <q-skeleton type="text" width="30%" />
+          </q-card>
+        </div>
+
+        <div v-else-if="!bookings.length" class="text-center q-py-xl">
+          <q-icon name="card_travel" size="64px" color="grey-5" />
+          <div class="text-h6 text-grey-7 q-mt-md">No packages booked yet</div>
+          <div class="text-body2 text-grey-6 q-mt-xs">
+            Book a curated package from an agency and it'll show up here.
+          </div>
+          <q-btn
+            class="q-mt-md" color="primary" unelevated rounded
+            icon="explore" label="Browse Packages" to="/packages"
+          />
+        </div>
+
+        <div v-else class="column q-gutter-md">
+          <q-card v-for="b in bookings" :key="b.id" flat bordered class="booking-row">
+            <div class="row items-center no-wrap q-pa-md q-gutter-md">
+              <q-avatar rounded size="60px" class="bg-grey-3">
+                <img v-if="b.package?.cover_image" :src="b.package.cover_image" />
+                <q-icon v-else name="landscape" color="grey-5" />
+              </q-avatar>
+
+              <div class="col" style="min-width: 0">
+                <div
+                  class="text-subtitle1 text-weight-bold cursor-pointer ellipsis"
+                  @click="b.package?.slug && $router.push(`/packages/${b.package.slug}`)"
+                >
+                  {{ b.package?.title || 'Package' }}
+                </div>
+                <div class="text-caption text-grey-7 q-mt-xs">
+                  <q-icon name="place" size="xs" /> {{ b.package?.destination?.name || '—' }}
+                  <span v-if="b.package?.start_date"> · {{ formatDate(b.package.start_date) }}</span>
+                </div>
+                <div class="text-caption text-grey-7 q-mt-xs">
+                  {{ b.travelers_count }} {{ b.travelers_count === 1 ? 'traveler' : 'travelers' }}
+                  · <span class="text-weight-medium text-deep-purple">PKR {{ fmtNum(b.total_amount) }}</span>
+                </div>
+              </div>
+
+              <div class="column items-end q-gutter-sm">
+                <q-badge :color="bookingColor(b.status)" class="q-px-sm q-py-xs capitalize">
+                  {{ b.status }}
+                </q-badge>
+                <q-btn
+                  v-if="b.status === 'confirmed' && b.package?.trip_id"
+                  unelevated dense no-caps size="sm"
+                  color="deep-purple" icon="forum" label="Group chat"
+                  :to="`/trips/${b.package.trip_id}/chat`"
+                />
+                <span v-else-if="b.status === 'confirmed'" class="text-caption text-grey-6">
+                  Group chat soon
+                </span>
+              </div>
+            </div>
+          </q-card>
+        </div>
+      </q-tab-panel>
     </q-tab-panels>
   </q-page>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useTripStore } from 'src/stores/tripStore'
+import { api } from 'src/boot/axios'
 
+const route = useRoute()
 const tripStore = useTripStore()
-const activeTab = ref('created')
+
+// Deep-linkable, so the sidebar can point straight at the packages tab.
+const activeTab = ref(['created', 'joined', 'packages'].includes(route.query.tab) ? route.query.tab : 'created')
+
+const bookings = ref([])
+const bookingsLoading = ref(true)
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '—'
@@ -151,8 +225,25 @@ const formatDate = (dateStr) => {
   return d.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+const fmtNum = (n) => Number(n || 0).toLocaleString()
+
+const bookingColor = (s) =>
+  ({ pending: 'orange', confirmed: 'positive', cancelled: 'negative', completed: 'blue' }[s] ?? 'grey')
+
+const loadBookings = async () => {
+  bookingsLoading.value = true
+  try {
+    const r = await api.get('/api/v1/bookings/my')
+    bookings.value = r.data.data || []
+  } catch {
+    bookings.value = []
+  } finally {
+    bookingsLoading.value = false
+  }
+}
+
 onMounted(async () => {
-  await tripStore.fetchMyTrips()
+  await Promise.all([tripStore.fetchMyTrips(), loadBookings()])
 })
 </script>
 
@@ -160,4 +251,6 @@ onMounted(async () => {
 .capitalize { text-transform: capitalize; }
 .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
 .card-hover:hover { transform: translateY(-4px); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+.booking-row { border-radius: 12px; transition: box-shadow 0.2s, transform 0.2s; }
+.booking-row:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(43,27,51,0.09); }
 </style>

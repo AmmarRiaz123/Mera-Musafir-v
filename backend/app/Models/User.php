@@ -11,6 +11,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Cache;
+use App\Support\ImageUrl;
 
 class User extends Authenticatable
 {
@@ -120,5 +121,10 @@ class User extends Authenticatable
             'preferences' => 'array',
         ];
     }
-}
 
+    // Persist image columns as relative paths (see ImageUrl::toPath).
+    public function setAvatarAttribute($value): void
+    {
+        $this->attributes['avatar'] = ImageUrl::toPath($value);
+    }
+}

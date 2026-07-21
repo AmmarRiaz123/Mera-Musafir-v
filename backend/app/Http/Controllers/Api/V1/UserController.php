@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\BlockedUser;
+use App\Models\Report;
 use App\Models\User;
+use App\Services\MatchingService;
 use App\Models\UserFollow;
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -17,7 +20,9 @@ class UserController extends Controller
         // Public route — resolve the optional Bearer token via the sanctum guard.
         $authUser = auth('sanctum')->user();
 
-        $query = User::withCount(['followers', 'following']);
+        // People discovery is traveller-to-traveller: business and admin
+        // accounts are not browsable profiles.
+        $query = User::where('type', 'traveler')->withCount(['followers', 'following']);
 
         if ($authUser) {
             $query->where('id', '!=', $authUser->id);
@@ -91,7 +96,7 @@ class UserController extends Controller
             return [
                 'id'              => $user->id,
                 'name'            => $user->name,
-                'avatar'          => $user->avatar,
+                'avatar'          => ImageUrl::resolve($user->avatar),
                 'city'            => $user->city,
                 'gender'          => $user->gender,
                 'is_verified'     => (bool) $user->is_verified,
@@ -138,6 +143,15 @@ class UserController extends Controller
             'is_friend'       => ($authUser && !$isSelf) ? $authUser->isFriendsWith($user->id) : false,
             'followers_count' => $user->followers()->count(),
             'following_count' => $user->following()->count(),
+            // True while the viewer has an unresolved report against this user
+            // (so the UI can hide the report button until an admin resolves it).
+            'reported_by_me'  => ($authUser && !$isSelf)
+                ? Report::where('reporter_id', $authUser->id)
+                    ->where('reported_id', $user->id)
+                    ->where('reported_type', User::class)
+                    ->whereNotIn('status', ['actioned', 'dismissed'])
+                    ->exists()
+                : false,
         ];
 
         return response()->json([
@@ -154,6 +168,7 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name'       => ['required', 'string', 'max:100'],
+            'avatar'     => ['nullable', 'string', 'max:2048'],
             'bio'        => ['nullable', 'string', 'max:500'],
             'city'       => ['nullable', 'string', 'max:100'],
             'phone'      => ['nullable', 'string', Rule::unique('users', 'phone')->ignore($user->id)],
@@ -163,6 +178,9 @@ class UserController extends Controller
         ]);
 
         $user->update($validated);
+
+        // Gender/preferences feed trip matching — drop the cached suggestions.
+        app(MatchingService::class)->clearUserCache($user->id);
 
         return response()->json([
             'message' => 'Profile updated successfully',

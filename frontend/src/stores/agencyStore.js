@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
 
 export const useAgencyStore = defineStore('agency', {
@@ -10,6 +10,7 @@ export const useAgencyStore = defineStore('agency', {
     currentPackage: null,
     myPackages: [],
     bookings: [],
+    pendingBookings: 0,
     analytics: null,
     loading: false,
     packagesLoading: false,
@@ -90,6 +91,19 @@ export const useAgencyStore = defineStore('agency', {
       const r = await api.get(`/api/v1/agencies/${slug}/analytics`)
       this.analytics = r.data
       return r.data
+    },
+
+    // Count only — used for the nav badge, so it must not clobber `bookings`.
+    async fetchPendingCount(slug) {
+      try {
+        const r = await api.get(`/api/v1/agencies/${slug}/bookings`, {
+          params: { status: 'pending' },
+        })
+        this.pendingBookings = (r.data.data || []).length
+      } catch {
+        this.pendingBookings = 0
+      }
+      return this.pendingBookings
     },
 
     async fetchAgencyBookings(slug, params = {}) {
@@ -194,3 +208,10 @@ export const useAgencyStore = defineStore('agency', {
     },
   },
 })
+
+// Keep the live store in sync when this file is edited during dev.
+// Without this, Pinia keeps the already-instantiated store (old actions)
+// until a full page reload.
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useAgencyStore, import.meta.hot))
+}

@@ -12,6 +12,7 @@ use App\Models\ExpenseShare;
 use App\Models\ItineraryDay;
 use App\Models\ItineraryItem;
 use App\Models\Trip;
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
 
 class PlanningController extends Controller
@@ -68,14 +69,14 @@ class PlanningController extends Controller
                 'paid_by'     => [
                     'id'     => $expense->paidBy->id,
                     'name'   => $expense->paidBy->name,
-                    'avatar' => $expense->paidBy->avatar,
+                    'avatar' => ImageUrl::resolve($expense->paidBy->avatar),
                 ],
                 'shares' => $expense->shares->map(fn($share) => [
                     'id'           => $share->id,
                     'user'         => [
                         'id'     => $share->user->id,
                         'name'   => $share->user->name,
-                        'avatar' => $share->user->avatar,
+                        'avatar' => ImageUrl::resolve($share->user->avatar),
                     ],
                     'share_amount' => $share->share_amount,
                     'is_settled'   => $share->is_settled,
@@ -166,7 +167,7 @@ class PlanningController extends Controller
                 'assigned_to'  => $item->assignedTo ? [
                     'id'     => $item->assignedTo->id,
                     'name'   => $item->assignedTo->name,
-                    'avatar' => $item->assignedTo->avatar,
+                    'avatar' => ImageUrl::resolve($item->assignedTo->avatar),
                 ] : null,
                 'completed_by' => $item->completedBy ? [
                     'id'   => $item->completedBy->id,

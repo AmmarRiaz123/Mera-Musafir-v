@@ -78,7 +78,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
-import { api } from 'src/boot/axios'
 import { useAuthStore } from 'src/stores/authStore'
 import { useSafetyStore } from 'src/stores/safetyStore'
 
@@ -104,11 +103,10 @@ onMounted(async () => {
 const saveDmPrivacy = async () => {
   saving.value = true
   try {
-    await api.put(`/api/v1/users/${authStore.user.id}`, {
+    await authStore.updateProfile({
       name: authStore.user.name,
       dm_privacy: dmPrivacy.value,
     })
-    authStore.user.dm_privacy = dmPrivacy.value
     $q.notify({ type: 'positive', message: 'Privacy settings saved', position: 'top' })
   } catch {
     $q.notify({ type: 'negative', message: 'Failed to save', position: 'top' })

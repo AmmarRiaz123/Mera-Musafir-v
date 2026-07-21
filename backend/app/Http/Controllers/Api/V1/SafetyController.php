@@ -8,6 +8,7 @@ use App\Models\BlockedUser;
 use App\Models\Message;
 use App\Models\Report;
 use App\Models\User;
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
 
 class SafetyController extends Controller
@@ -88,7 +89,7 @@ class SafetyController extends Controller
             ->map(fn($b) => [
                 'id'     => $b->blocked->id,
                 'name'   => $b->blocked->name,
-                'avatar' => $b->blocked->avatar,
+                'avatar' => ImageUrl::resolve($b->blocked->avatar),
             ]);
 
         return response()->json(['data' => $blocked]);

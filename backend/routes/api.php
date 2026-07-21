@@ -8,10 +8,12 @@ use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\DestinationController;
 use App\Http\Controllers\Api\V1\MatchingController;
+use App\Http\Controllers\Api\V1\MessageRequestController;
 use App\Http\Controllers\Api\V1\PackageController;
 use App\Http\Controllers\Api\V1\PlanningController;
 use App\Http\Controllers\Api\V1\SafetyController;
 use App\Http\Controllers\Api\V1\TripController;
+use App\Http\Controllers\Api\V1\UploadController;
 use App\Http\Controllers\Api\V1\UserController;
 
 // Public routes
@@ -75,6 +77,9 @@ Route::prefix('v1')->group(function () {
         // Profile
         Route::put('/users/{user}',         [UserController::class, 'update']);
 
+        // Image uploads (avatars, covers, logos)
+        Route::post('/uploads',             [UploadController::class, 'store']);
+
         // Safety
         Route::post('/report',              [SafetyController::class, 'report']);
         Route::post('/users/{user}/block',  [SafetyController::class, 'block']);
@@ -88,6 +93,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/conversations/{conversation}',                                            [ConversationController::class, 'show']);
         Route::post('/conversations/{conversation}/messages',                                  [ConversationController::class, 'send']);
         Route::post('/conversations/{conversation}/messages/{message}/respond',                [ConversationController::class, 'respondToInvite']);
+
+        // Message requests (DM-privacy nudges)
+        Route::get('/message-requests',                     [MessageRequestController::class, 'index']);
+        Route::post('/message-requests',                    [MessageRequestController::class, 'store']);
+        Route::post('/message-requests/{messageRequest}/accept', [MessageRequestController::class, 'accept']);
+        Route::delete('/message-requests/{messageRequest}', [MessageRequestController::class, 'dismiss']);
 
         // Trips
         Route::post('/trips',                              [TripController::class, 'store']);

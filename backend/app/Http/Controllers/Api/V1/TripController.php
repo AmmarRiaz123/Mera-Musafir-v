@@ -10,6 +10,9 @@ use App\Models\BlockedUser;
 use App\Models\GroupChat;
 use App\Models\Trip;
 use App\Models\TripMember;
+use App\Services\MatchingService;
+use App\Support\Messages;
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
 
 class TripController extends Controller
@@ -151,9 +154,13 @@ class TripController extends Controller
     }
 
     // Update a trip
-    public function update(UpdateTripRequest $request, Trip $trip)
+    public function update(UpdateTripRequest $request, Trip $trip, MatchingService $matching)
     {
         $trip->update($request->validated());
+
+        // Visibility/type/date changes alter who this trip should be shown to.
+        $matching->clearTripCache($trip->id);
+
         $trip->load(['creator', 'destination', 'joinedMembers']);
 
         return response()->json([
@@ -179,36 +186,46 @@ class TripController extends Controller
     {
         $user = auth()->user();
 
+        // Business accounts don't join travellers' trips — it turns personal
+        // trips into a sales channel. They still host their own package trips,
+        // which are created for them when a booking is confirmed.
+        if ($user->type === 'agency' && $trip->creator_id !== $user->id) {
+            return Messages::json('agency_cannot_join');
+        }
+
         // Cannot join a trip created by someone in a block relationship.
         if (BlockedUser::blockExistsBetween($user->id, $trip->creator_id)) {
-            return response()->json(['message' => 'You cannot join this trip'], 403);
+            return Messages::json('join_blocked');
         }
 
         // Check if trip is full
         if ($trip->isFull()) {
-            return response()->json(['message' => 'This trip is full'], 422);
+            return Messages::json('trip_full');
         }
 
         // Check if already a member
         if ($trip->hasMember($user->id)) {
-            return response()->json(['message' => 'You are already in this trip'], 422);
+            return Messages::json('already_joined');
         }
 
         // Enforce women-only restriction
         if ($trip->visibility === 'women_only' && $user->gender !== 'female') {
-            return response()->json(['message' => 'This trip is for women only'], 403);
+            return Messages::json('women_only');
         }
 
         // Open trips: join instantly. Invite-only: pending approval
         $status = $trip->visibility === 'invite_only' ? 'pending' : 'joined';
 
-        TripMember::create([
-            'trip_id'   => $trip->id,
-            'user_id'   => $user->id,
-            'status'    => $status,
-            'role'      => 'member',
-            'joined_at' => $status === 'joined' ? now() : null,
-        ]);
+        // Reuse any previous membership row — (trip_id, user_id) is unique, so a
+        // user who left and comes back must update their old row, not insert.
+        TripMember::updateOrCreate(
+            ['trip_id' => $trip->id, 'user_id' => $user->id],
+            [
+                'status'    => $status,
+                'role'      => 'member',
+                'joined_at' => $status === 'joined' ? now() : null,
+            ]
+        );
 
         // Increment count only if immediately joined
         if ($status === 'joined') {
@@ -232,11 +249,11 @@ class TripController extends Controller
             ->first();
 
         if (!$member) {
-            return response()->json(['message' => 'You are not in this trip'], 422);
+            return Messages::json('not_in_trip');
         }
 
         if ($member->role === 'host') {
-            return response()->json(['message' => 'Host cannot leave the trip'], 422);
+            return Messages::json('host_cannot_leave');
         }
 
         if ($member->status === 'joined') {
@@ -258,7 +275,7 @@ class TripController extends Controller
             'data'    => $trip->members->map(fn($user) => [
                 'id'          => $user->id,
                 'name'        => $user->name,
-                'avatar'      => $user->avatar,
+                'avatar'      => ImageUrl::resolve($user->avatar),
                 'city'        => $user->city,
                 'is_verified' => (bool) $user->is_verified,
                 'status'      => $user->pivot->status,

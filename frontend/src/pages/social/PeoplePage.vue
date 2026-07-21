@@ -143,10 +143,12 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useSocialStore } from 'src/stores/socialStore'
+import { useNotificationStore } from 'src/stores/notificationStore'
 
 const router = useRouter()
 const $q = useQuasar()
 const socialStore = useSocialStore()
+const notificationStore = useNotificationStore()
 
 const search = ref('')
 const filterCity = ref('')
@@ -197,8 +199,12 @@ const handleMessage = async (user) => {
     const conv = await socialStore.startConversation(user.id)
     router.push(`/messages/${conv.id}`)
   } catch (e) {
-    const msg = e.response?.data?.message || 'Cannot start conversation'
-    $q.notify({ type: 'negative', message: msg, position: 'top' })
+    const data = e.response?.data
+    if (data?.requested) {
+      notificationStore.promptRequest({ id: user.id, name: user.name, avatar: user.avatar })
+    } else {
+      $q.notify({ type: 'negative', message: data?.message || 'Cannot start conversation', position: 'top' })
+    }
   }
 }
 

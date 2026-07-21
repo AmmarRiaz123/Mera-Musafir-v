@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Support\ImageUrl;
 
 class Trip extends Model
 {
@@ -99,8 +100,21 @@ class Trip extends Model
     }
 
     // Check if a user is already a member
+    /**
+     * Only counts *active* membership. A row with status 'left' or 'declined'
+     * is history — it must not block the user from joining again.
+     */
     public function hasMember(int $userId): bool
     {
-        return $this->members()->where('user_id', $userId)->exists();
+        return $this->members()
+                    ->where('user_id', $userId)
+                    ->wherePivotIn('status', ['joined', 'pending'])
+                    ->exists();
+    }
+
+    // Persist image columns as relative paths (see ImageUrl::toPath).
+    public function setCoverImageAttribute($value): void
+    {
+        $this->attributes['cover_image'] = ImageUrl::toPath($value);
     }
 }

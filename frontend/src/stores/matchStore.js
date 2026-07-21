@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
 
 export const useMatchStore = defineStore('match', {
@@ -31,3 +31,10 @@ export const useMatchStore = defineStore('match', {
     },
   },
 })
+
+// Keep the live store in sync when this file is edited during dev.
+// Without this, Pinia keeps the already-instantiated store (old actions)
+// until a full page reload.
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useMatchStore, import.meta.hot))
+}

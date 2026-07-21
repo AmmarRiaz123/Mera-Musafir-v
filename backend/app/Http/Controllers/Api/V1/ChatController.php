@@ -8,6 +8,7 @@ use App\Models\BlockedUser;
 use App\Models\GroupChat;
 use App\Models\Message;
 use App\Models\Trip;
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
 
 class ChatController extends Controller
@@ -81,7 +82,7 @@ class ChatController extends Controller
             'sender'     => [
                 'id'          => $msg->sender->id,
                 'name'        => $msg->sender->name,
-                'avatar'      => $msg->sender->avatar,
+                'avatar'      => ImageUrl::resolve($msg->sender->avatar),
                 'is_verified' => (bool) $msg->sender->is_verified,
             ],
             'created_at' => $msg->created_at,

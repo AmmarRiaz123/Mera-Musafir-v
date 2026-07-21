@@ -5,14 +5,19 @@ namespace App\Http\Controllers\Api\V1;
 use App\Events\ConversationMessageSent;
 use App\Http\Controllers\Controller;
 use App\Models\BlockedUser;
+use App\Models\Booking;
 use App\Models\Conversation;
 use App\Models\ConversationMessage;
+use App\Models\MessageRequest;
 use App\Models\Trip;
 use App\Models\TripInvite;
 use App\Models\TripMember;
 use App\Models\User;
 use App\Models\UserFollow;
+use App\Support\Messages;
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ConversationController extends Controller
@@ -39,7 +44,7 @@ class ConversationController extends Controller
                 'other_user'   => [
                     'id'          => $other->id,
                     'name'        => $other->name,
-                    'avatar'      => $other->avatar,
+                    'avatar'      => ImageUrl::resolve($other->avatar),
                     'is_verified' => (bool) $other->is_verified,
                 ],
                 'last_message' => $lastMsg ? [
@@ -70,17 +75,34 @@ class ConversationController extends Controller
 
         $target = User::findOrFail($targetId);
 
+        // Agencies may reply to travellers and reach their own customers, but
+        // may not cold-open a conversation — that's the classic B2C spam vector.
+        $authUser = auth()->user();
+        if ($authUser->type === 'agency' && !$this->agencyMayContact($authUser, $targetId)) {
+            return Messages::json('agency_cannot_dm');
+        }
+
+        // When gated, signal the client to open the "send a message request"
+        // flow — the request (with the composed message) is created via
+        // MessageRequestController@store, so nothing is recorded if they cancel.
         if ($target->dm_privacy === 'nobody') {
-            return response()->json(['message' => 'This user is not accepting messages'], 403);
+            return response()->json([
+                'message'   => "This user isn't accepting messages right now. You can send them a message request.",
+                'requested' => true,
+            ], 403);
         }
 
         if ($target->dm_privacy === 'followers') {
-            $isFollowing = UserFollow::where('follower_id', auth()->id())
-                ->where('following_id', $target->id)
+            // "People I follow": the recipient (target) must follow the sender.
+            $targetFollowsSender = UserFollow::where('follower_id', $target->id)
+                ->where('following_id', auth()->id())
                 ->exists();
 
-            if (!$isFollowing) {
-                return response()->json(['message' => 'This user only accepts messages from people they follow'], 403);
+            if (!$targetFollowsSender) {
+                return response()->json([
+                    'message'   => "This user only accepts messages from people they follow. You can send them a message request.",
+                    'requested' => true,
+                ], 403);
             }
         }
 
@@ -93,7 +115,7 @@ class ConversationController extends Controller
                 'other_user' => [
                     'id'          => $target->id,
                     'name'        => $target->name,
-                    'avatar'      => $target->avatar,
+                    'avatar'      => ImageUrl::resolve($target->avatar),
                     'is_verified' => (bool) $target->is_verified,
                     'dm_privacy'  => $target->dm_privacy,
                 ],
@@ -136,7 +158,7 @@ class ConversationController extends Controller
                 'other_user'      => [
                     'id'          => $other->id,
                     'name'        => $other->name,
-                    'avatar'      => $other->avatar,
+                    'avatar'      => ImageUrl::resolve($other->avatar),
                     'is_verified' => (bool) $other->is_verified,
                 ],
                 'blocked_by_me'   => $iBlockedThem,
@@ -172,17 +194,28 @@ class ConversationController extends Controller
         // DM privacy check — enforced on every send, not just at conversation creation.
         $recipient = User::find($recipientId);
 
+        // Privacy changed after this conversation existed — capture the typed
+        // message as a request so it can be delivered if the recipient accepts.
         if ($recipient && $recipient->dm_privacy === 'nobody') {
-            return response()->json(['message' => 'This user is not accepting messages'], 403);
+            $this->recordMessageRequest($userId, $recipientId, $request->input('body'));
+            return response()->json([
+                'message'   => "This user isn't accepting messages right now. We've saved your message as a request.",
+                'requested' => true,
+            ], 403);
         }
 
         if ($recipient && $recipient->dm_privacy === 'followers') {
-            $isFollowing = UserFollow::where('follower_id', $userId)
-                ->where('following_id', $recipientId)
+            // "People I follow": the recipient must follow the sender.
+            $recipientFollowsSender = UserFollow::where('follower_id', $recipientId)
+                ->where('following_id', $userId)
                 ->exists();
 
-            if (!$isFollowing) {
-                return response()->json(['message' => 'This user only accepts messages from followers'], 403);
+            if (!$recipientFollowsSender) {
+                $this->recordMessageRequest($userId, $recipientId, $request->input('body'));
+                return response()->json([
+                    'message'   => "This user only accepts messages from people they follow. We've saved your message as a request.",
+                    'requested' => true,
+                ], 403);
             }
         }
 
@@ -205,7 +238,7 @@ class ConversationController extends Controller
                 ->exists();
 
             if (!$isMember) {
-                return response()->json(['message' => 'You are not a member of this trip'], 422);
+                return Messages::json('not_a_member');
             }
 
             $alreadyInvited = TripInvite::where('trip_id', $trip->id)
@@ -214,7 +247,17 @@ class ConversationController extends Controller
                 ->exists();
 
             if ($alreadyInvited) {
-                return response()->json(['message' => 'This user already has a pending invite for this trip'], 422);
+                return Messages::json('invite_pending');
+            }
+
+            // Nothing to invite them to if they're already in the trip.
+            $alreadyMember = TripMember::where('trip_id', $trip->id)
+                ->where('user_id', $recipientId)
+                ->whereIn('status', ['joined', 'pending'])
+                ->exists();
+
+            if ($alreadyMember) {
+                return Messages::json('invite_already_member');
             }
 
             $metadata = [
@@ -224,29 +267,39 @@ class ConversationController extends Controller
                 'start_date'       => $trip->start_date,
                 'end_date'         => $trip->end_date,
                 'spots_left'       => $trip->max_travelers - $trip->current_count,
+                'visibility'       => $trip->visibility,
                 'status'           => 'pending',
             ];
 
             $body = "Trip Invite: {$trip->title}";
         }
 
-        $message = ConversationMessage::create([
-            'conversation_id' => $conversation->id,
-            'sender_id'       => $userId,
-            'body'            => $body,
-            'type'            => $type,
-            'metadata'        => $metadata,
-        ]);
-
-        if ($type === 'trip_invite') {
-            TripInvite::create([
-                'trip_id'                 => $validated['trip_id'],
-                'inviter_id'              => $userId,
-                'invitee_id'              => $recipientId,
-                'conversation_message_id' => $message->id,
-                'status'                  => 'pending',
+        // Message + invite are written together: if the invite fails we must not
+        // leave an orphaned invite card in the conversation.
+        $message = DB::transaction(function () use ($conversation, $userId, $body, $type, $metadata, $validated, $recipientId) {
+            $message = ConversationMessage::create([
+                'conversation_id' => $conversation->id,
+                'sender_id'       => $userId,
+                'body'            => $body,
+                'type'            => $type,
+                'metadata'        => $metadata,
             ]);
-        }
+
+            if ($type === 'trip_invite') {
+                // (trip_id, invitee_id) is unique — a previously declined or
+                // accepted invite must be revived, not inserted again.
+                TripInvite::updateOrCreate(
+                    ['trip_id' => $validated['trip_id'], 'invitee_id' => $recipientId],
+                    [
+                        'inviter_id'              => $userId,
+                        'conversation_message_id' => $message->id,
+                        'status'                  => 'pending',
+                    ]
+                );
+            }
+
+            return $message;
+        });
 
         $conversation->update(['last_message_at' => now()]);
         $message->load('sender');
@@ -272,7 +325,7 @@ class ConversationController extends Controller
         }
 
         if ($message->sender_id === $userId) {
-            return response()->json(['message' => 'You cannot respond to your own invite'], 422);
+            return Messages::json('invite_own');
         }
 
         $validated = $request->validate([
@@ -282,11 +335,11 @@ class ConversationController extends Controller
         $invite = TripInvite::where('conversation_message_id', $message->id)->first();
 
         if (!$invite) {
-            return response()->json(['message' => 'Invite not found'], 404);
+            return Messages::json('invite_not_found');
         }
 
         if ($invite->status !== 'pending') {
-            return response()->json(['message' => 'Invite already responded to'], 422);
+            return Messages::json('invite_answered');
         }
 
         if ($validated['action'] === 'accept') {
@@ -298,20 +351,27 @@ class ConversationController extends Controller
                 ->exists();
 
             if ($alreadyMember) {
-                return response()->json(['message' => 'You are already in this trip'], 422);
+                return Messages::json('already_joined');
+            }
+
+            // Women-only trips are enforced here too — an invite is not a bypass.
+            if ($trip->visibility === 'women_only' && auth()->user()->gender !== 'female') {
+                return Messages::json('women_only');
             }
 
             if ($trip->current_count >= $trip->max_travelers) {
-                return response()->json(['message' => 'This trip is now full'], 422);
+                return Messages::json('trip_full');
             }
 
-            TripMember::create([
-                'trip_id'   => $trip->id,
-                'user_id'   => $userId,
-                'status'    => 'joined',
-                'role'      => 'member',
-                'joined_at' => now(),
-            ]);
+            // (trip_id, user_id) is unique — reuse the row if they were here before.
+            TripMember::updateOrCreate(
+                ['trip_id' => $trip->id, 'user_id' => $userId],
+                [
+                    'status'    => 'joined',
+                    'role'      => 'member',
+                    'joined_at' => now(),
+                ]
+            );
             $trip->increment('current_count');
 
             $invite->update(['status' => 'accepted']);
@@ -346,9 +406,60 @@ class ConversationController extends Controller
             'sender'     => [
                 'id'          => $msg->sender->id,
                 'name'        => $msg->sender->name,
-                'avatar'      => $msg->sender->avatar,
+                'avatar'      => ImageUrl::resolve($msg->sender->avatar),
                 'is_verified' => (bool) $msg->sender->is_verified,
             ],
         ];
+    }
+
+    /**
+     * Record (or refresh) a pending message request so the recipient is notified
+     * that someone whose DM they've gated would like to reach them.
+     */
+    /**
+     * An agency owner may open a conversation with someone only if that person
+     * already reached out, or is a customer of theirs.
+     */
+    private function agencyMayContact(User $agencyUser, int $targetId): bool
+    {
+        $conversationIds = Conversation::where(function ($q) use ($agencyUser, $targetId) {
+            $q->where('user_one_id', $agencyUser->id)->where('user_two_id', $targetId);
+        })->orWhere(function ($q) use ($agencyUser, $targetId) {
+            $q->where('user_one_id', $targetId)->where('user_two_id', $agencyUser->id);
+        })->pluck('id');
+
+        // They messaged us first.
+        if ($conversationIds->isNotEmpty()) {
+            $theyWroteFirst = ConversationMessage::whereIn('conversation_id', $conversationIds)
+                ->where('sender_id', $targetId)
+                ->exists();
+
+            if ($theyWroteFirst) {
+                return true;
+            }
+        }
+
+        // Or they're a customer of this agency.
+        $agency = $agencyUser->agency;
+        if (!$agency) {
+            return true;
+        }
+
+        return Booking::whereIn('agency_package_id', $agency->packages()->pluck('id'))
+            ->where('user_id', $targetId)
+            ->exists();
+    }
+
+    private function recordMessageRequest(int $requesterId, int $recipientId, ?string $message = null): void
+    {
+        $attributes = ['status' => 'pending'];
+        if (filled($message)) {
+            $attributes['message'] = $message;
+        }
+
+        MessageRequest::updateOrCreate(
+            ['requester_id' => $requesterId, 'recipient_id' => $recipientId],
+            $attributes,
+        );
     }
 }

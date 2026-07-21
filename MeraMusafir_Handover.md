@@ -177,7 +177,7 @@ Nobody has run this checklist top to bottom yet. Go through every item. Note pas
 32. Confirm the booking as the agency (dashboard → Bookings tab).
 33. As the traveler, reload the package page → does it show "Booking Confirmed" + "Join Group Chat"?
 34. Click Join Group Chat → does it open the correct trip chat?
-35. `/#/my-bookings` → does the booking show with correct status and a working Join Group Chat button?
+35. `` → does the booking show with correct status and a working Join Group Chat button?
 36. Cancel a booking → does "Book Now" reappear on the package (re-booking should be allowed after cancellation)?
 
 ---

@@ -85,34 +85,55 @@
           <q-item-section class="text-negative">Report Message</q-item-section>
         </q-item>
         <q-item clickable v-close-popup @click="confirmBlockSender">
-          <q-item-section avatar><q-icon name="block" color="grey-7" /></q-item-section>
-          <q-item-section>Block User</q-item-section>
+          <q-item-section avatar>
+            <q-icon
+              :name="safetyStore.isBlocked(msgMenu.activeMsg?.sender?.id) ? 'person_add' : 'block'"
+              color="grey-7"
+            />
+          </q-item-section>
+          <q-item-section>
+            {{ safetyStore.isBlocked(msgMenu.activeMsg?.sender?.id) ? 'Unblock User' : 'Block User' }}
+          </q-item-section>
         </q-item>
       </q-list>
     </q-menu>
 
     <!-- Input bar -->
-    <div class="input-bar row items-center q-pa-sm q-gutter-xs bg-white shadow-up-2">
-      <q-input
-        v-model="inputText"
-        class="col"
-        outlined
-        dense
-        placeholder="Type a message..."
-        :disable="sending"
-        autogrow
-        @keyup.enter.prevent="sendMsg"
-        style="max-height: 120px;"
-      />
-      <q-btn
-        round
-        color="primary"
-        icon="send"
-        unelevated
-        @click="sendMsg"
-        :loading="sending"
-        :disable="!inputText.trim() || sending"
-      />
+    <div class="input-bar bg-white shadow-up-2">
+      <transition name="limit-fade">
+        <div v-if="atLimit" class="limit-banner row items-center no-wrap">
+          <q-icon name="info" size="16px" class="q-mr-xs" />
+          <span>
+            You've reached the <strong>{{ MESSAGE_MAX.toLocaleString() }}</strong>-character limit.
+            Send this and continue in a new message.
+          </span>
+        </div>
+      </transition>
+
+      <div class="row items-center q-pa-sm q-gutter-xs">
+        <q-input
+          v-model="inputText"
+          class="col"
+          outlined
+          dense
+          placeholder="Type a message..."
+          :disable="sending"
+          autogrow
+          @keyup.enter.prevent="sendMsg"
+          @paste="onPaste"
+          :maxlength="MESSAGE_MAX"
+          style="max-height: 120px;"
+        />
+        <q-btn
+          round
+          color="primary"
+          icon="send"
+          unelevated
+          @click="sendMsg"
+          :loading="sending"
+          :disable="!inputText.trim() || sending"
+        />
+      </div>
     </div>
 
     <!-- Report message dialog -->
@@ -149,6 +170,7 @@ import { useChatStore } from 'src/stores/chatStore'
 import { useAuthStore } from 'src/stores/authStore'
 import { useSafetyStore } from 'src/stores/safetyStore'
 import ReportDialog from 'src/components/ReportDialog.vue'
+import { MESSAGE_MAX, clampMessage, overflowFromPaste, notifyTrimmed } from 'src/utils/messageLimit'
 
 const route = useRoute()
 const router = useRouter() // eslint-disable-line no-unused-vars
@@ -165,6 +187,22 @@ const tripInitial = computed(() => {
 
 const inputText = ref('')
 const sending = ref(false)
+
+const atLimit = computed(() => inputText.value.length >= MESSAGE_MAX)
+
+// Native maxlength truncates the paste; we only tell the user what was lost.
+const onPaste = (e) => {
+  const pasted = e.clipboardData?.getData('text') ?? ''
+  const el = e.target
+  const selectionLength = (el?.selectionEnd ?? 0) - (el?.selectionStart ?? 0)
+  const removed = overflowFromPaste(pasted, inputText.value.length, selectionLength)
+  if (removed > 0) notifyTrimmed($q, removed)
+}
+
+// Defensive: keep the model within the limit even if set programmatically.
+watch(inputText, (val) => {
+  if (val && val.length > MESSAGE_MAX) inputText.value = clampMessage(val)
+})
 const messagesContainer = ref(null)
 const bottomAnchor = ref(null)
 
@@ -185,6 +223,9 @@ const scrollToBottom = () => {
 watch(() => chatStore.messages.length, scrollToBottom)
 
 onMounted(async () => {
+  // Needed so the message menu can show Block vs Unblock correctly.
+  if (authStore.isLoggedIn) safetyStore.fetchBlockList()
+
   chatStore.messages = []
   await chatStore.fetchMessages(tripId.value)
   chatStore.subscribeToTrip(tripId.value)
@@ -204,8 +245,20 @@ const sendMsg = async () => {
     await chatStore.sendMessage(tripId.value, body)
     inputText.value = ''
   } catch (err) {
-    const msg = err.response?.data?.message || 'Could not send message'
-    $q.notify({ color: 'negative', message: msg, icon: 'error' })
+    const isValidation = err.response?.status === 422
+    $q.notify({
+      icon: isValidation ? 'rule' : 'error',
+      color: isValidation ? 'amber-8' : 'negative',
+      textColor: 'white',
+      message: 'Message not sent',
+      caption: isValidation
+        ? err.response?.data?.errors?.body?.[0] ||
+          err.response?.data?.message ||
+          `Messages are limited to ${MESSAGE_MAX.toLocaleString()} characters.`
+        : err.response?.data?.message || 'Check your connection and try again.',
+      position: 'top',
+      timeout: 5000,
+    })
   } finally {
     sending.value = false
   }
@@ -239,18 +292,27 @@ const openReportMsg = () => {
 }
 
 const confirmBlockSender = () => {
+  // Unblocking is harmless — only confirm the destructive direction.
+  if (safetyStore.isBlocked(msgMenu.value.activeMsg?.sender?.id)) {
+    doBlockSender()
+    return
+  }
   blockConfirmDialog.value = true
 }
 
 const doBlockSender = async () => {
   blockConfirmDialog.value = false
-  const senderId = msgMenu.value.activeMsg?.sender?.id
-  if (!senderId) return
+  const sender = msgMenu.value.activeMsg?.sender
+  if (!sender?.id) return
   try {
-    const result = await safetyStore.toggleBlock(senderId)
-    $q.notify({ color: 'info', icon: 'block', message: result.message })
+    const result = await safetyStore.toggleBlock(sender.id, sender)
+    $q.notify({
+      color: 'info',
+      icon: result.blocked ? 'block' : 'person_add',
+      message: result.message,
+    })
   } catch {
-    $q.notify({ color: 'negative', message: 'Failed to block user' })
+    $q.notify({ color: 'negative', message: 'Action failed' })
   }
 }
 
@@ -284,6 +346,22 @@ const formatTime = (dateStr) => {
   flex-shrink: 0;
   border-top: 1px solid #e0e0e0;
 }
+
+/* Shown only once the character cap is actually reached. */
+.limit-banner {
+  padding: 8px 16px;
+  background: linear-gradient(90deg, #f3e5f5 0%, #ede7f6 100%);
+  color: #5e35b1;
+  font-size: 12.5px;
+  line-height: 1.35;
+  border-bottom: 1px solid rgba(94, 53, 177, 0.15);
+}
+.limit-banner strong { font-weight: 600; }
+
+.limit-fade-enter-active,
+.limit-fade-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }
+.limit-fade-enter-from,
+.limit-fade-leave-to { opacity: 0; transform: translateY(4px); }
 
 .message-bubble {
   max-width: 70%;

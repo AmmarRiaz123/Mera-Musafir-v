@@ -15,6 +15,7 @@ class UpdateTripRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'cover_image'    => 'nullable|string|max:2048',
             'title'         => 'sometimes|string|max:150',
             'description'   => 'sometimes|nullable|string|max:2000',
             'start_date'    => 'sometimes|date|after_or_equal:today',

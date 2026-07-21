@@ -101,6 +101,8 @@ class AgencyController extends Controller
 
         $validated = $request->validate([
             'business_name'  => 'sometimes|string|max:150',
+            'logo'           => 'sometimes|nullable|string|max:2048',
+            'cover_image'    => 'sometimes|nullable|string|max:2048',
             'description'    => 'sometimes|nullable|string',
             'contact_phone'  => 'sometimes|nullable|string|max:20',
             'contact_email'  => 'sometimes|nullable|email|max:150',
@@ -124,17 +126,23 @@ class AgencyController extends Controller
 
         if ($isFollowing) {
             $agency->followers()->detach($userId);
-            $agency->decrement('follower_count');
             $nowFollowing = false;
         } else {
-            $agency->followers()->attach($userId);
-            $agency->increment('follower_count');
+            // syncWithoutDetaching is idempotent — a double-click can't create
+            // a duplicate follow row.
+            $agency->followers()->syncWithoutDetaching([$userId]);
             $nowFollowing = true;
         }
 
+        // Derive the count from the pivot rather than incrementing a counter.
+        // The counter could drift out of sync (and even go negative) whenever a
+        // toggle was applied against a stale is_following state.
+        $count = $agency->followers()->count();
+        $agency->forceFill(['follower_count' => $count])->save();
+
         return response()->json([
             'is_following'   => $nowFollowing,
-            'follower_count' => $agency->fresh()->follower_count,
+            'follower_count' => $count,
         ]);
     }
 

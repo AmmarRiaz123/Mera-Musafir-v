@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -24,7 +25,7 @@ class DestinationResource extends JsonResource
             'description' => $this->description,
             'best_season' => $this->best_season,
             'travel_tips' => $this->travel_tips,
-            'cover_image' => $this->cover_image,
+            'cover_image' => ImageUrl::resolve($this->cover_image),
             'gallery' => $this->gallery,
             'coordinates' => [
                 'lat' => $this->latitude,

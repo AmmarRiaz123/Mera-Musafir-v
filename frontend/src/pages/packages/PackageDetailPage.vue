@@ -32,7 +32,7 @@
             <div class="row items-center justify-between q-mb-xs">
               <div class="text-h4 text-weight-bold">{{ pkg.title }}</div>
               <q-btn
-                v-if="authStore.isLoggedIn && !isOwnAgency"
+                v-if="authStore.isLoggedIn && !isOwnAgency && !pkg.reported_by_me"
                 flat round dense
                 icon="flag"
                 color="grey-5"
@@ -41,6 +41,12 @@
               >
                 <q-tooltip>Report this package</q-tooltip>
               </q-btn>
+              <q-icon
+                v-else-if="authStore.isLoggedIn && !isOwnAgency && pkg.reported_by_me"
+                name="flag" color="grey-4" size="sm"
+              >
+                <q-tooltip>Reported — under review</q-tooltip>
+              </q-icon>
             </div>
 
             <!-- Agency badge -->
@@ -111,8 +117,8 @@
             </div>
 
             <!-- Agency section -->
-            <div v-if="pkg.agency" class="q-mt-xl q-pa-md rounded-borders" style="background: #f3e5f5">
-              <div class="text-subtitle1 text-weight-bold q-mb-sm">About the Agency</div>
+            <div v-if="pkg.agency" class="agency-card q-mt-xl">
+              <div class="agency-card-title">About the agency</div>
               <div class="row items-center q-gutter-md">
                 <q-avatar size="48px">
                   <img v-if="pkg.agency.logo" :src="pkg.agency.logo" />
@@ -143,10 +149,10 @@
 
           <!-- Sticky booking card -->
           <div class="col-12 col-md-4">
-            <q-card flat bordered class="sticky" style="top: 80px">
-              <q-card-section class="bg-deep-purple text-white">
-                <div class="text-caption opacity-80">Price per person</div>
-                <div class="text-h4 text-weight-bold">{{ pkg.formatted_price }}</div>
+            <q-card flat bordered class="sticky booking-card" style="top: 80px">
+              <q-card-section class="price-head">
+                <div class="price-label">Price per person</div>
+                <div class="price-value">{{ pkg.formatted_price }}</div>
               </q-card-section>
 
               <q-card-section class="column q-gutter-xs">
@@ -174,48 +180,50 @@
               <!-- Traveler's booking status -->
               <q-card-section v-if="myBooking" class="q-pt-none column q-gutter-sm">
                 <!-- Pending -->
-                <q-badge
-                  v-if="myBooking.status === 'pending'"
-                  color="grey-6"
-                  class="q-pa-sm text-body2"
-                  multi-line
-                >
-                  Booking Pending — awaiting agency confirmation
-                </q-badge>
+                <div v-if="myBooking.status === 'pending'" class="status-note status-note--pending">
+                  <q-icon name="hourglass_top" size="17px" />
+                  <div>
+                    <strong>Booking pending</strong>
+                    <span>Waiting for {{ pkg.agency?.business_name || 'the agency' }} to confirm.</span>
+                  </div>
+                </div>
 
                 <!-- Confirmed -->
                 <template v-else-if="myBooking.status === 'confirmed'">
-                  <q-badge color="positive" class="q-pa-sm text-body2" multi-line>
-                    {{ pkg.trip_id ? 'Booking Confirmed' : 'Booking Confirmed — group chat will be available soon' }}
-                  </q-badge>
+                  <div class="status-note status-note--confirmed">
+                    <q-icon name="check_circle" size="17px" />
+                    <div>
+                      <strong>Booking confirmed</strong>
+                      <span v-if="!pkg.trip_id">Your group chat opens shortly.</span>
+                      <span v-else>You're on the list — say hello to your group.</span>
+                    </div>
+                  </div>
                   <q-btn
                     v-if="pkg.trip_id"
                     unelevated
+                    no-caps
                     color="deep-purple"
                     icon="forum"
-                    label="Join Group Chat"
+                    label="Join group chat"
                     class="full-width"
                     :to="`/trips/${pkg.trip_id}/chat`"
                   />
                 </template>
 
-                <!-- Cancelled -->
-                <q-badge
-                  v-else-if="myBooking.status === 'cancelled'"
-                  color="negative"
-                  class="q-pa-sm text-body2"
-                >
-                  Booking Cancelled
-                </q-badge>
+                <!-- Cancelled: neutral, not alarming — they can simply book again. -->
+                <div v-else-if="myBooking.status === 'cancelled'" class="status-note status-note--muted">
+                  <q-icon name="history" size="17px" />
+                  <div>
+                    <strong>Previous booking cancelled</strong>
+                    <span>You can book this package again below.</span>
+                  </div>
+                </div>
 
                 <!-- Any other status (e.g. completed) -->
-                <q-badge
-                  v-else
-                  :color="bookingStatusColor(myBooking.status)"
-                  class="q-pa-sm text-body2 capitalize"
-                >
-                  {{ myBooking.status }}
-                </q-badge>
+                <div v-else class="status-note status-note--muted">
+                  <q-icon name="info" size="17px" />
+                  <div><strong class="capitalize">{{ myBooking.status }}</strong></div>
+                </div>
               </q-card-section>
 
               <q-card-actions class="q-px-md q-pb-md">
@@ -256,6 +264,7 @@
       v-model="reportDialog"
       :reported-id="pkg.id"
       reported-type="package"
+      @reported="pkg.reported_by_me = true"
     />
 
     <!-- Book dialog -->
@@ -384,7 +393,59 @@ const toggleFollow = async () => {
 }
 
 const tierColor = (t) => ({ basic: 'grey-6', pro: 'blue-7', premium: 'deep-purple' }[t] ?? 'grey')
-const bookingStatusColor = (s) => ({ pending: 'orange', confirmed: 'positive', cancelled: 'negative', completed: 'blue' }[s] ?? 'grey')
 const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
 const fmt = (n) => Number(n || 0).toLocaleString()
 </script>
+
+<style scoped>
+.booking-card { border-radius: 14px; overflow: hidden; border-color: #ece6f0; }
+
+.price-head {
+  background: linear-gradient(135deg, #6a1b9a 0%, #4a148c 100%);
+  color: #fff;
+  padding: 18px 18px 16px;
+}
+.price-label { font-size: 11.5px; letter-spacing: 0.04em; opacity: 0.82; }
+.price-value { font-size: 27px; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; }
+
+/* Booking state: informative, never alarming — a cancelled booking is just
+   history, and "Book Now" sits right underneath it. */
+.status-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.status-note div { display: flex; flex-direction: column; gap: 1px; }
+.status-note strong { font-weight: 600; }
+.status-note span { opacity: 0.85; }
+
+.status-note--pending { background: #fff8e1; color: #8d6e00; }
+.status-note--pending .q-icon { color: #ef6c00; }
+
+.status-note--confirmed { background: #e8f5e9; color: #1b5e20; }
+.status-note--confirmed .q-icon { color: #2e7d32; }
+
+.status-note--muted { background: #f4f0f7; color: #6b5a75; }
+.status-note--muted .q-icon { color: #9b8aa5; }
+
+.capitalize { text-transform: capitalize; }
+
+.agency-card {
+  padding: 16px 18px;
+  border-radius: 13px;
+  background: linear-gradient(120deg, #faf5fd 0%, #f4ecf8 100%);
+  border: 1px solid #ece0f2;
+}
+.agency-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #9b8aa5;
+  margin-bottom: 12px;
+}
+</style>

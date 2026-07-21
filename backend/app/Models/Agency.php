@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Support\ImageUrl;
 
 class Agency extends Model
 {
@@ -57,5 +58,17 @@ class Agency extends Model
     {
         if ($this->tier === 'basic') return true;
         return $this->subscription_expires_at !== null && $this->subscription_expires_at->isFuture();
+    }
+
+    // Persist image columns as relative paths (see ImageUrl::toPath).
+    public function setLogoAttribute($value): void
+    {
+        $this->attributes['logo'] = ImageUrl::toPath($value);
+    }
+
+    // Persist image columns as relative paths (see ImageUrl::toPath).
+    public function setCoverImageAttribute($value): void
+    {
+        $this->attributes['cover_image'] = ImageUrl::toPath($value);
     }
 }

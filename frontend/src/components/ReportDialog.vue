@@ -57,7 +57,7 @@ const props = defineProps({
   reportedId:   { type: Number, required: true },
   reportedType: { type: String, required: true }, // 'user' | 'message' | 'package'
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'reported'])
 
 const $q = useQuasar()
 const safetyStore = useSafetyStore()
@@ -95,6 +95,7 @@ const submit = async () => {
       description.value || null,
     )
     $q.notify({ color: 'positive', icon: 'check_circle', message: 'Report submitted' })
+    emit('reported')
     close()
   } catch (err) {
     errorMsg.value = err.response?.data?.message || 'Failed to submit report'

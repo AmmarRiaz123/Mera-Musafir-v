@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
@@ -200,3 +200,10 @@ export const useSocialStore = defineStore('social', {
     },
   },
 })
+
+// Keep the live store in sync when this file is edited during dev.
+// Without this, Pinia keeps the already-instantiated store (old actions)
+// until a full page reload.
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useSocialStore, import.meta.hot))
+}

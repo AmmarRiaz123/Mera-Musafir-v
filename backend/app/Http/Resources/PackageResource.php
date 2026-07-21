@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -25,8 +26,8 @@ class PackageResource extends JsonResource
             'duration_days'       => $this->duration_days,
             'includes'            => $this->includes ?? [],
             'itinerary_overview'  => $this->itinerary_overview,
-            'cover_image'         => $this->cover_image,
-            'gallery'             => $this->gallery ?? [],
+            'cover_image'         => ImageUrl::resolve($this->cover_image),
+            'gallery'             => ImageUrl::resolveMany($this->gallery),
             'type'                => $this->type,
             'status'              => $this->status,
             'views_count'         => $this->views_count,

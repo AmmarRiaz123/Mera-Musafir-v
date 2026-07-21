@@ -28,7 +28,10 @@ class MatchingService
                 'trip'  => $trips[$item['trip_id']] ?? null,
                 'score' => $item['score'],
             ], $scored),
+            // Eligibility is re-checked against the *live* trip, never the
+            // cached score list — a trip may have become women-only since.
             fn($item) => $item['trip'] !== null
+                && ($user->gender === 'female' || $item['trip']->visibility !== 'women_only')
         ));
     }
 
@@ -45,7 +48,10 @@ class MatchingService
                 'user'  => $users[$item['user_id']] ?? null,
                 'score' => $item['score'],
             ], $scored),
+            // Final gate applied to the live trip + user, so a cached list
+            // built before the trip became women-only can't leak men through.
             fn($item) => $item['user'] !== null
+                && ($trip->visibility !== 'women_only' || $item['user']->gender === 'female')
         ));
     }
 

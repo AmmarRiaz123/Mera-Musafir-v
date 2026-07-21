@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\ImageUrl;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,7 +21,7 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'type' => $this->type,
-            'avatar' => $this->avatar,
+            'avatar' => ImageUrl::resolve($this->avatar),
             'bio' => $this->bio,
             'city' => $this->city,
             'gender' => $this->gender,
@@ -28,6 +29,7 @@ class UserResource extends JsonResource
             'is_verified' => $this->is_verified,
             'is_blocked' => $this->is_blocked,
             'preferences' => $this->preferences,
+            'dm_privacy' => $this->dm_privacy,
             'roles' => $this->whenLoaded('roles', function () {
                 return $this->roles->pluck('name');
             }),

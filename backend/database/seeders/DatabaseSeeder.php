@@ -48,9 +48,11 @@ class DatabaseSeeder extends Seeder
         );
         $traveler->assignRole('traveler');
 
-        // Seed destinations
+        // Seed destinations + systematic test users + sample agencies/packages
         $this->call([
             DestinationSeeder::class,
+            TestUsersSeeder::class,
+            AgencySeeder::class,
         ]);
     }
 }

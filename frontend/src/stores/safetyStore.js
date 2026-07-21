@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
 
 export const useSafetyStore = defineStore('safety', {
@@ -17,9 +17,19 @@ export const useSafetyStore = defineStore('safety', {
       })
     },
 
-    async toggleBlock(userId) {
+    // `user` is optional; pass it so the blocked list keeps name/avatar for
+    // the Privacy Settings screen without needing a refetch.
+    async toggleBlock(userId, user = null) {
       const r = await api.post(`/api/v1/users/${userId}/block`)
-      if (!r.data.blocked) {
+      if (r.data.blocked) {
+        if (!this.blockedUsers.some(u => u.id === userId)) {
+          this.blockedUsers.push({
+            id:     userId,
+            name:   user?.name ?? null,
+            avatar: user?.avatar ?? null,
+          })
+        }
+      } else {
         this.blockedUsers = this.blockedUsers.filter(u => u.id !== userId)
       }
       return r.data
@@ -40,3 +50,10 @@ export const useSafetyStore = defineStore('safety', {
     },
   },
 })
+
+// Keep the live store in sync when this file is edited during dev.
+// Without this, Pinia keeps the already-instantiated store (old actions)
+// until a full page reload.
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useSafetyStore, import.meta.hot))
+}

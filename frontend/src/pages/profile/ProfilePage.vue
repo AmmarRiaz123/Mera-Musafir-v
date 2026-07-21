@@ -34,7 +34,13 @@
                     </q-item-section>
                     <q-item-section>{{ safetyStore.isBlocked(profileUser.id) ? 'Unblock User' : 'Block User' }}</q-item-section>
                   </q-item>
-                  <q-item clickable v-close-popup @click="reportDialog = true">
+                  <q-item v-if="profileUser.reported_by_me" clickable disable>
+                    <q-item-section avatar>
+                      <q-icon name="flag" color="grey-5" />
+                    </q-item-section>
+                    <q-item-section class="text-grey-6">Reported — under review</q-item-section>
+                  </q-item>
+                  <q-item v-else clickable v-close-popup @click="reportDialog = true">
                     <q-item-section avatar>
                       <q-icon name="flag" color="negative" />
                     </q-item-section>
@@ -141,10 +147,11 @@
         v-model="reportDialog"
         :reported-id="profileUser.id"
         reported-type="user"
+        @reported="profileUser.reported_by_me = true"
       />
 
       <!-- EDIT MODE -->
-      <div v-else>
+      <div v-if="isEditMode">
         <q-card-section class="row items-center justify-between">
           <div class="text-h6 text-primary">Edit Profile</div>
           <q-btn flat round icon="close" @click="cancelEdit" />
@@ -152,6 +159,16 @@
 
         <q-card-section>
           <q-form @submit.prevent="onSave" class="q-gutter-md">
+            <div class="column items-center q-mb-sm">
+              <ImageUpload
+                v-model="form.avatar"
+                type="avatar"
+                round
+                icon="add_a_photo"
+                label="Photo"
+              />
+            </div>
+
             <q-input
               v-model="form.name"
               label="Name"
@@ -243,6 +260,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { useSafetyStore } from 'src/stores/safetyStore'
 import { useSocialStore } from 'src/stores/socialStore'
+import { useNotificationStore } from 'src/stores/notificationStore'
+import ImageUpload from 'components/ImageUpload.vue'
 import { useQuasar } from 'quasar'
 import ReportDialog from 'src/components/ReportDialog.vue'
 
@@ -251,6 +270,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const safetyStore = useSafetyStore()
 const socialStore = useSocialStore()
+const notificationStore = useNotificationStore()
 const $q = useQuasar()
 
 // Follow state is derived from the store's currentUser, which is hydrated
@@ -323,7 +343,7 @@ const loadProfile = async () => {
 
 const handleBlock = async () => {
   try {
-    const result = await safetyStore.toggleBlock(profileUser.value.id)
+    const result = await safetyStore.toggleBlock(profileUser.value.id, profileUser.value)
     $q.notify({ color: 'info', icon: result.blocked ? 'block' : 'person_add', message: result.message })
   } catch {
     $q.notify({ color: 'negative', message: 'Action failed' })
@@ -348,7 +368,16 @@ const handleMessage = async () => {
     const conv = await socialStore.startConversation(profileUser.value.id)
     router.push(`/messages/${conv.id}`)
   } catch (e) {
-    $q.notify({ type: 'negative', message: e.response?.data?.message || 'Cannot start conversation', position: 'top' })
+    const data = e.response?.data
+    if (data?.requested) {
+      notificationStore.promptRequest({
+        id: profileUser.value.id,
+        name: profileUser.value.name,
+        avatar: profileUser.value.avatar,
+      })
+    } else {
+      $q.notify({ type: 'negative', message: data?.message || 'Cannot start conversation', position: 'top' })
+    }
   }
 }
 
@@ -361,6 +390,7 @@ const togglePref = (arr, value) => {
 const toggleEditMode = () => {
   form.value = {
     name: profileUser.value.name || '',
+    avatar: profileUser.value.avatar || null,
     bio: profileUser.value.bio || '',
     city: profileUser.value.city || '',
     phone: profileUser.value.phone || '',

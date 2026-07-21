@@ -8,6 +8,7 @@ use App\Http\Resources\PackageResource;
 use App\Models\AgencyPackage;
 use App\Models\Booking;
 use App\Models\GroupChat;
+use App\Models\Report;
 use App\Models\Trip;
 use App\Models\TripMember;
 use Illuminate\Http\Request;
@@ -75,9 +76,23 @@ class PackageController extends Controller
 
         $package->load(['agency.user', 'destination']);
 
+        // Whether the viewer has an unresolved report against this package,
+        // so the UI can hide the report button until an admin resolves it.
+        $authUser     = auth('sanctum')->user();
+        $reportedByMe = $authUser
+            ? Report::where('reporter_id', $authUser->id)
+                ->where('reported_id', $package->id)
+                ->where('reported_type', AgencyPackage::class)
+                ->whereNotIn('status', ['actioned', 'dismissed'])
+                ->exists()
+            : false;
+
         return response()->json([
             'message' => 'Package retrieved',
-            'data'    => new PackageResource($package),
+            'data'    => array_merge(
+                (new PackageResource($package))->resolve(),
+                ['reported_by_me' => $reportedByMe],
+            ),
         ]);
     }
 
@@ -279,6 +294,10 @@ class PackageController extends Controller
                     'start_date'     => $package->start_date,
                     'end_date'       => $package->end_date,
                     'max_travelers'  => $package->max_capacity,
+                    // For a package departure, capacity is measured in SEATS,
+                    // not accounts — one booking may carry several travelers.
+                    // The agency host is staff and doesn't occupy a paid seat,
+                    // so this starts at 0 and grows by travelers_count.
                     'current_count'  => 0,
                     'type'           => 'cultural',
                     'visibility'     => 'invite_only',
@@ -306,8 +325,9 @@ class PackageController extends Controller
                 ['status' => 'joined', 'role' => 'member', 'joined_at' => now()]
             );
 
+            // Seats, not accounts: a party of 4 fills 4 spots on the departure.
             if ($member->wasRecentlyCreated) {
-                $trip->increment('current_count');
+                $trip->increment('current_count', $booking->travelers_count);
             }
         }
 
@@ -345,7 +365,8 @@ class PackageController extends Controller
 
             if ($member && $member->status === 'joined') {
                 $member->delete();
-                $trip->decrement('current_count');
+                // Release the whole party's seats, not just one.
+                $trip->decrement('current_count', $booking->travelers_count);
             }
         }
 

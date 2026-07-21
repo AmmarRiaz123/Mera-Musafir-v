@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Support\ImageUrl;
 
 class AgencyPackage extends Model
 {
@@ -63,5 +64,11 @@ class AgencyPackage extends Model
     public function spotsLeft(): int
     {
         return max(0, $this->max_capacity - $this->booked_count);
+    }
+
+    // Persist image columns as relative paths (see ImageUrl::toPath).
+    public function setCoverImageAttribute($value): void
+    {
+        $this->attributes['cover_image'] = ImageUrl::toPath($value);
     }
 }
