@@ -11,7 +11,9 @@
         <div class="head-line">
           <span class="post-name" @click="goToAuthor">{{ displayName }}</span>
           <q-icon v-if="post.author.is_verified" name="verified" size="13px" color="deep-purple" />
-          <span v-if="post.author.is_agency" class="agency-tag">Agency</span>
+          <span v-if="post.author.is_agency" class="agency-tag">
+            <q-icon name="storefront" size="10px" />Agency
+          </span>
         </div>
         <div class="head-sub">
           <span class="type-inline" :class="`type-inline--${meta.color}`">
@@ -21,6 +23,12 @@
             <span class="dot">·</span>
             <router-link :to="`/destinations/${post.destination.slug}`" class="dest-tag">
               {{ post.destination.name }}
+            </router-link>
+          </template>
+          <template v-if="post.author.is_agency && post.author.agency_slug">
+            <span class="dot">·</span>
+            <router-link :to="`/agencies/${post.author.agency_slug}`" class="agency-link">
+              View agency
             </router-link>
           </template>
           <span class="dot">·</span>
@@ -420,7 +428,22 @@ const timeAgo = (iso) => {
   border-radius: 14px;
   overflow: hidden;
 }
-.post--agency { border-color: #ddd0e8; }
+/* An agency post is a business talking to travellers, and people deserve to
+   clock that before they read it — not after. The old treatment was a border
+   two shades off the default, which nobody could see. This is a plum edge, a
+   tinted header band and a badge with an icon; the body stays white so photos
+   aren't cast in purple. */
+.post--agency {
+  border-color: #d3bfe2;
+  /* A real border, not an inset shadow — child sections paint their own
+     backgrounds over an inset shadow, so the stripe stopped at the comments. */
+  border-left: 3px solid #7b1fa2;
+}
+.post--agency .post-head {
+  background: linear-gradient(180deg, #f7f0fb, #fff);
+  border-bottom: 1px solid #f0e6f6;
+}
+.post--agency .post-name { color: #4a148c; }
 
 /* ── Author ─────────────────────────────────────────── */
 .post-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
@@ -434,9 +457,14 @@ const timeAgo = (iso) => {
 .post-name:hover { opacity: 0.7; }
 
 .agency-tag {
-  padding: 1px 6px; border-radius: 999px; background: #4a148c; color: #fff;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 999px; color: #fff;
+  background: linear-gradient(135deg, #7b1fa2, #4a148c);
   font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  box-shadow: 0 1px 3px rgba(74, 20, 140, 0.28);
 }
+.agency-link { color: #7b1fa2; font-weight: 600; text-decoration: none; }
+.agency-link:hover { text-decoration: underline; }
 
 .head-sub { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 11.5px; color: #9b8aa5; }
 .dot { opacity: 0.55; }
