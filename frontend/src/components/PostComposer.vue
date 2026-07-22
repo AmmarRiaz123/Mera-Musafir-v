@@ -447,9 +447,16 @@ const submit = async () => {
 
 /* Inside a dialog the card provides the frame, so drop the extra chrome. */
 .composer--dialog { border: 0; border-radius: 0; margin: 0; box-shadow: none; }
-.composer--dialog .editor { max-height: none; }
+.composer--dialog .editor { max-height: 86vh; }
+/* Media tiles and pickers can still outgrow the dialog, so the two controls
+   that end the flow stay pinned to the bottom of the card. */
+.composer--dialog .attach-bar,
+.composer--dialog .editor-actions { position: sticky; z-index: 1; }
+.composer--dialog .attach-bar { bottom: 54px; }
+.composer--dialog .editor-actions { bottom: 0; border-top: 1px solid #f4eff7; }
 .editor-head {
   display: flex; align-items: center; gap: 10px;
+  position: sticky; top: 0; z-index: 1;
   padding: 12px 14px; border-bottom: 1px solid #f4eff7;
   background: linear-gradient(180deg, #faf7fc, #fff);
 }
@@ -475,6 +482,10 @@ const submit = async () => {
 }
 .body-wrap:focus-within { border-color: #c9b3d6; background: #fff; }
 .body-input { font-size: 14px; }
+/* Autogrow sets an inline height from scrollHeight, so a long post would push
+   Share off the bottom of the screen. max-height beats the inline height; past
+   that the caption scrolls inside its own box. */
+.body-input :deep(textarea) { max-height: 32vh; overflow-y: auto; }
 
 .gallery-strip {
   display: flex; gap: 8px; margin: 10px 14px 0;
