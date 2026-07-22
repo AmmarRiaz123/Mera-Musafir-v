@@ -182,6 +182,7 @@ import ReportDialog from 'components/ReportDialog.vue'
 import SharePostDialog from 'components/SharePostDialog.vue'
 import { POST_TYPES } from 'src/utils/postTypes'
 import { useSocialStore } from 'src/stores/socialStore'
+import { useNotificationStore } from 'src/stores/notificationStore'
 import { useRouter, useRoute } from 'vue-router'
 
 const $q = useQuasar()
@@ -189,6 +190,7 @@ const authStore = useAuthStore()
 const store = useCommunityStore()
 const audioStore = useFeedAudioStore()
 const socialStore = useSocialStore()
+const notificationStore = useNotificationStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -212,8 +214,18 @@ const onMessageAuthor = async (post) => {
     router.push(`/messages/${conv.id}`)
   } catch (err) {
     const data = err.response?.data
+    // Gated by their DM privacy — open the request composer rather than telling
+    // someone who just tapped "I'm interested" to go find it themselves.
+    if (data?.requested) {
+      notificationStore.promptRequest({
+        id: post.author.id,
+        name: post.author.name,
+        avatar: post.author.avatar,
+      })
+      return
+    }
     $q.notify({
-      type: data?.requested ? 'info' : 'negative',
+      type: 'negative',
       message: data?.message || 'Could not open the conversation',
       position: 'top',
     })

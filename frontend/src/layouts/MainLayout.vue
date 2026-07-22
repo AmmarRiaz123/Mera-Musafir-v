@@ -292,30 +292,43 @@
 
     <!-- Send a message request to a user who limits who can DM them -->
     <q-dialog
+      class="request-dialog"
+      transition-show="jump-up"
+      transition-hide="jump-down"
       :model-value="!!notificationStore.promptUser"
       @update:model-value="(v) => { if (!v) notificationStore.cancelPrompt() }"
     >
-      <q-card style="min-width: 340px; max-width: 420px">
-        <q-card-section>
-          <div class="text-h6">Send a message request</div>
-          <div class="text-caption text-grey-6">
-            {{ notificationStore.promptUser?.name }} limits who can message them. They'll see your
-            message and can accept or ignore it.
+      <q-card class="mr-card">
+        <header class="mr-head">
+          <q-avatar size="46px" class="mr-avatar">
+            <img v-if="notificationStore.promptUser?.avatar" :src="notificationStore.promptUser.avatar" />
+            <span v-else>{{ notificationStore.promptUser?.name?.[0]?.toUpperCase() }}</span>
+          </q-avatar>
+          <div class="mr-head-text">
+            <div class="mr-title">Knock first</div>
+            <div class="mr-sub">
+              {{ firstName }} keeps their inbox quiet. Send a note and they can let you in.
+            </div>
           </div>
-        </q-card-section>
+          <q-btn flat round dense size="sm" icon="close" color="grey-7" @click="notificationStore.cancelPrompt()" />
+        </header>
 
-        <q-card-section class="q-pt-none">
-          <q-input
-            v-model="requestBody"
-            type="textarea"
-            outlined
-            autogrow
-            rows="3"
-            label="Your message"
-            :maxlength="MESSAGE_MAX"
-            @paste="onRequestPaste"
-            autofocus
-          />
+        <div class="mr-body">
+          <div class="mr-wrap">
+            <q-input
+              v-model="requestBody"
+              class="mr-input"
+              type="textarea"
+              borderless
+              autogrow
+              :rows="3"
+              :maxlength="MESSAGE_MAX"
+              :placeholder="`Hi ${firstName} — say why you're reaching out. A real reason goes a long way.`"
+              autofocus
+              @paste="onRequestPaste"
+            />
+          </div>
+
           <transition name="limit-fade">
             <div v-if="requestAtLimit" class="limit-banner row items-center no-wrap q-mt-sm">
               <q-icon name="info" size="16px" class="q-mr-xs" />
@@ -325,18 +338,28 @@
               </span>
             </div>
           </transition>
-        </q-card-section>
 
-        <q-card-actions align="right">
-          <q-btn flat label="Cancel" @click="notificationStore.cancelPrompt()" />
+          <div class="mr-foot">
+            <span class="mr-note">
+              <q-icon name="lock_outline" size="13px" />
+              They see this before deciding. Nothing sends until they accept.
+            </span>
+            <span class="mr-count">{{ requestBody.length }}/{{ MESSAGE_MAX.toLocaleString() }}</span>
+          </div>
+        </div>
+
+        <footer class="mr-actions">
+          <q-btn flat no-caps color="grey-7" label="Not now" @click="notificationStore.cancelPrompt()" />
           <q-btn
-            unelevated
+            unelevated rounded no-caps
             color="deep-purple"
+            icon="send"
             label="Send request"
             :loading="sendingRequest"
+            :disable="!requestBody.trim()"
             @click="submitRequest"
           />
-        </q-card-actions>
+        </footer>
       </q-card>
     </q-dialog>
   </q-layout>
@@ -374,6 +397,9 @@ const savedNav = localStorage.getItem(NAV_KEY)
 const drawerOpen = ref(savedNav === null ? $q.screen.gt.sm : savedNav === 'true')
 const acting = ref(null)
 const requestBody = ref('')
+const firstName = computed(
+  () => notificationStore.promptUser?.name?.split(' ')[0] ?? 'They',
+)
 const sendingRequest = ref(false)
 
 const unreadCount = computed(() => socialStore.totalUnread)
@@ -570,6 +596,55 @@ const handleLogout = async () => {
   line-height: 1.35;
 }
 .limit-banner strong { font-weight: 600; }
+
+/* ── Message request composer ───────────────────────── */
+.mr-card { width: 460px; max-width: 94vw; border-radius: 16px; overflow: hidden; }
+
+.mr-head {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 15px 14px 14px;
+  border-bottom: 1px solid #f4eff7;
+  background: linear-gradient(180deg, #f7f0fb, #fff);
+}
+.mr-avatar {
+  flex-shrink: 0; background: linear-gradient(135deg, #7b1fa2, #4a148c);
+  color: #fff; font-weight: 700; font-size: 17px;
+  box-shadow: 0 2px 8px rgba(74, 20, 140, 0.22);
+}
+.mr-head-text { flex: 1; min-width: 0; }
+.mr-title {
+  font-size: 17px; font-weight: 700; line-height: 1.2;
+  background: linear-gradient(135deg, #4a148c, #7b1fa2);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.mr-sub { font-size: 12.5px; color: #7a6a82; margin-top: 3px; }
+
+.mr-body { padding: 14px; }
+.mr-wrap {
+  padding: 4px 12px;
+  border: 1px solid #ece6f0; border-radius: 12px; background: #fcfafd;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.mr-wrap:focus-within { border-color: #c9b3d6; background: #fff; }
+.mr-input { font-size: 13.5px; }
+/* Same autogrow trap as the composer — cap it or Send walks off the screen. */
+.mr-input :deep(textarea) { max-height: 26vh; overflow-y: auto; }
+
+.mr-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 9px;
+}
+.mr-note {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; color: #9b8aa5;
+}
+.mr-count { font-size: 11px; color: #b0a3b8; flex-shrink: 0; }
+
+.mr-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 11px 14px 13px;
+  border-top: 1px solid #f4eff7; background: #fcfafd;
+}
 
 .limit-fade-enter-active,
 .limit-fade-leave-active { transition: opacity 0.18s ease, transform 0.18s ease; }

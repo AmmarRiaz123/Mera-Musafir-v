@@ -47,7 +47,8 @@
 
 /* Dialogs that should push the page back rather than just dim it. */
 .composer-dialog .q-dialog__backdrop,
-.report-dialog .q-dialog__backdrop {
+.report-dialog .q-dialog__backdrop,
+.request-dialog .q-dialog__backdrop {
   backdrop-filter: blur(6px);
   background: rgba(43, 27, 51, 0.42);
 }
