@@ -1,6 +1,9 @@
 <template>
   <q-page padding>
-    <div class="text-h4 text-weight-bold q-mb-md">Messages</div>
+    <div class="q-mb-md">
+      <span class="page-eyebrow"><q-icon name="chat" size="12px" />Social</span>
+      <h1 class="page-title">Messages</h1>
+    </div>
 
     <q-tabs
       v-model="tab"

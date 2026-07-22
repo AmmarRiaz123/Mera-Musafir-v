@@ -2,7 +2,7 @@
   <q-page padding class="flex flex-center">
     <q-card style="width: 100%; max-width: 560px" flat bordered>
       <q-card-section class="bg-deep-purple text-white q-pa-lg">
-        <div class="text-h5 text-weight-bold">Register Your Agency</div>
+        <h1 class="page-title page-title--sm">Register Your Agency</h1>
         <div class="text-body2 opacity-80 q-mt-xs">
           Create your agency profile to start listing travel packages
         </div>

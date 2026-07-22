@@ -796,7 +796,8 @@ const monthOf = (d) =>
   color: #fff; font-weight: 700; font-size: 20px; flex-shrink: 0;
 }
 .head-text { flex: 1; min-width: 0; }
-.head-title { margin: 0; font-size: 27px; font-weight: 700; letter-spacing: -0.02em; color: #2b1b33; line-height: 1.15; }
+.head-title { margin: 0; font-size: 27px; font-weight: 600; letter-spacing: -0.02em; background: linear-gradient(95deg, #3d1152 0%, #6b2d5e 45%, #8e3d8a 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; line-height: 1.15; }
 .head-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 
 .chip {

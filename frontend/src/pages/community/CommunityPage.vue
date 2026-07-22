@@ -2,9 +2,9 @@
   <q-page class="feed-page">
     <div class="feed-shell">
       <header class="feed-head">
-        <div>
-          <h1 class="feed-title">Community</h1>
-          <p class="feed-sub">Stories, tips and reviews from travellers across Pakistan.</p>
+        <div class="feed-head-text">
+          <span class="page-eyebrow"><q-icon name="forum" size="12px" />Social</span>
+          <h1 class="page-title page-title--sm">Community</h1>
         </div>
       </header>
 
@@ -332,7 +332,7 @@ onUnmounted(() => audioStore.stop())
 <style scoped>
 .feed-page {
   background: #faf8fc;
-  padding: 20px 16px 0;
+  padding: 14px 16px 0;
   /* Fixed height so the feed below can own its own scrolling. */
   height: calc(100vh - 58px);
   display: flex;
@@ -362,7 +362,8 @@ onUnmounted(() => audioStore.stop())
   margin-bottom: 16px;
 }
 
-.feed-head { margin-bottom: 18px; }
+.feed-head { margin-bottom: 10px; flex-shrink: 0; }
+.feed-head-text { display: flex; flex-direction: column; }
 .focus-bar {
   display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
   padding: 6px 10px; border-radius: 999px; background: #f3ecf7; border: 1px solid #e8dcf0;
@@ -376,8 +377,6 @@ onUnmounted(() => audioStore.stop())
   padding-bottom: 24px; scrollbar-width: none;
 }
 .focus-scroll::-webkit-scrollbar { display: none; }
-.feed-title { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: #2b1b33; }
-.feed-sub { margin: 4px 0 0; font-size: 14px; color: #7a6a82; }
 
 /* Composer */
 .composer {
@@ -399,7 +398,7 @@ onUnmounted(() => audioStore.stop())
 
 /* Filters */
 .filter-row {
-  display: flex; gap: 7px; margin-bottom: 16px;
+  display: flex; gap: 7px; margin-bottom: 12px; flex-shrink: 0;
   overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
 }
 .filter-row::-webkit-scrollbar { display: none; }

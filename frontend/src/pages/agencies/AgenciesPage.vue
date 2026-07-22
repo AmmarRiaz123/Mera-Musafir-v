@@ -2,7 +2,10 @@
   <q-page padding>
     <div class="row items-center justify-between q-mb-lg">
       <div>
-        <div class="text-h4 text-weight-bold">Travel Agencies</div>
+        <div>
+      <span class="page-eyebrow"><q-icon name="business" size="12px" />Discover</span>
+      <h1 class="page-title">Travel Agencies</h1>
+    </div>
         <div class="text-caption text-grey-6">Discover verified agencies offering curated Pakistan trips</div>
       </div>
     </div>

@@ -1,7 +1,10 @@
 <template>
   <q-page padding>
     <div class="row items-center justify-between q-mb-lg">
-      <div class="text-h4 text-weight-bold">Explore Trips</div>
+      <div>
+      <span class="page-eyebrow"><q-icon name="hiking" size="12px" />Trips</span>
+      <h1 class="page-title">Explore Trips</h1>
+    </div>
       <q-btn color="primary" icon="add" label="Create Trip" to="/trips/create" unelevated rounded />
     </div>
 

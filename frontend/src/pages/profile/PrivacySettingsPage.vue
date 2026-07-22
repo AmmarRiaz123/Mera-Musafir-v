@@ -2,7 +2,7 @@
   <q-page padding>
     <div class="row items-center q-mb-lg">
       <q-btn flat round icon="arrow_back" color="grey-7" @click="$router.push('/profile')" />
-      <div class="text-h5 text-weight-bold q-ml-sm">Privacy Settings</div>
+      <h1 class="page-title page-title--sm q-ml-sm">Privacy Settings</h1>
     </div>
 
     <!-- DM Privacy -->

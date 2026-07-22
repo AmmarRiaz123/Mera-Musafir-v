@@ -414,7 +414,8 @@ const submit = async (status) => {
 .form-shell { max-width: 760px; margin: 0 auto; }
 
 .page-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
-.page-title { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; color: #2b1b33; }
+.page-title { margin: 0; font-size: 30px; line-height: 1.15; font-weight: 600; letter-spacing: -0.02em; background: linear-gradient(95deg, #3d1152 0%, #6b2d5e 45%, #8e3d8a 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
 .page-sub { margin: 4px 0 0; font-size: 14px; color: #7a6a82; }
 
 .form-card {

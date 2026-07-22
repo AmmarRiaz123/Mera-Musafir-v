@@ -417,22 +417,22 @@ const submit = async () => {
 <style scoped>
 .composer {
   background: #fff; border: 1px solid #ece6f0; border-radius: 14px;
-  margin-bottom: 16px; overflow: hidden;
+  margin-bottom: 12px; overflow: hidden; flex-shrink: 0;
   box-shadow: 0 1px 2px rgba(43, 27, 51, 0.03);
 }
 
-.prompt { display: flex; align-items: center; gap: 11px; padding: 13px 15px; cursor: pointer; transition: background 0.15s ease; }
+.prompt { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; transition: background 0.15s ease; }
 .prompt:hover { background: #fcfafd; }
 .prompt-avatar {
   background: linear-gradient(135deg, #7b1fa2, #4a148c);
   color: #fff; font-weight: 700; font-size: 13px; flex-shrink: 0;
 }
 .prompt-text {
-  flex: 1; font-size: 13.5px; color: #9b8aa5;
-  padding: 8px 14px; border-radius: 999px; background: #f7f3fa; border: 1px solid #f0eaf4;
+  flex: 1; font-size: 13px; color: #9b8aa5;
+  padding: 7px 14px; border-radius: 999px; background: #f7f3fa; border: 1px solid #f0eaf4;
 }
 
-.editor { padding: 0; }
+.editor { padding: 0; max-height: 70vh; overflow-y: auto; }
 .editor-head {
   display: flex; align-items: center; gap: 10px;
   padding: 12px 14px; border-bottom: 1px solid #f4eff7;

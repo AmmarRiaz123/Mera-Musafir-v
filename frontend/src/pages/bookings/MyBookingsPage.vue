@@ -1,6 +1,9 @@
 <template>
   <q-page padding>
-    <div class="text-h4 text-weight-bold q-mb-lg">My Bookings</div>
+    <div class="q-mb-lg">
+      <span class="page-eyebrow"><q-icon name="confirmation_number" size="12px" />Account</span>
+      <h1 class="page-title">My Bookings</h1>
+    </div>
 
     <!-- Loading -->
     <div v-if="loading" class="column q-gutter-md">

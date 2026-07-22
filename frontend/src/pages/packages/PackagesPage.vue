@@ -2,7 +2,10 @@
   <q-page padding>
     <div class="row items-center justify-between q-mb-lg">
       <div>
-        <div class="text-h4 text-weight-bold">Travel Packages</div>
+        <div>
+      <span class="page-eyebrow"><q-icon name="card_travel" size="12px" />Discover</span>
+      <h1 class="page-title">Travel Packages</h1>
+    </div>
         <div class="text-caption text-grey-6">Curated trips by verified agencies across Pakistan</div>
       </div>
     </div>

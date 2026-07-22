@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="row items-center q-mb-lg">
       <q-btn flat round dense icon="arrow_back" @click="$router.back()" />
-      <div class="text-h5 text-weight-bold q-ml-sm">Expenses</div>
+      <h1 class="page-title page-title--sm q-ml-sm">Expenses</h1>
       <q-space />
       <q-btn color="teal" unelevated rounded icon="add" label="Add" @click="openAddExpense" />
     </div>

@@ -1,7 +1,10 @@
 <template>
   <q-page padding>
     <div class="row items-center q-mb-lg">
-      <div class="text-h4 text-weight-bold">Explore Pakistan</div>
+      <div>
+      <span class="page-eyebrow"><q-icon name="travel_explore" size="12px" />Discover</span>
+      <h1 class="page-title">Explore Pakistan</h1>
+    </div>
     </div>
 
     <!-- Filters Input Area -->

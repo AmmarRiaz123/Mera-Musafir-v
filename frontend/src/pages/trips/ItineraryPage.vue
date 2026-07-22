@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="row items-center q-mb-lg">
       <q-btn flat round dense icon="arrow_back" @click="$router.back()" />
-      <div class="text-h5 text-weight-bold q-ml-sm">Itinerary</div>
+      <h1 class="page-title page-title--sm q-ml-sm">Itinerary</h1>
       <q-space />
       <q-btn color="deep-purple" unelevated rounded icon="add" label="Add Day" @click="showAddDay = true" />
     </div>

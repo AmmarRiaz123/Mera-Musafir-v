@@ -1,1 +1,46 @@
 // app global css
+
+/* ──────────────────────────────────────────────────────────────
+   Page headings
+   Replaces the plain heavy-black <h1> on every page with a lighter,
+   branded treatment: a small coloured eyebrow over a tighter title in
+   deep plum rather than pure black.
+   ────────────────────────────────────────────────────────────── */
+.page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a07bb5;
+  margin-bottom: 2px;
+}
+
+.page-title {
+  margin: 0;
+  font-family: 'Poppins', system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  /* Deep plum → violet, so it reads as brand rather than default black. */
+  background: linear-gradient(95deg, #3d1152 0%, #6b2d5e 45%, #8e3d8a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.page-title--sm { font-size: 21px; }
+
+.page-sub {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: #7a6a82;
+}
+
+@media (max-width: 599px) {
+  .page-title { font-size: 21px; }
+  .page-title--sm { font-size: 18px; }
+}

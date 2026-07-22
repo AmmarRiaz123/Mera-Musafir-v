@@ -399,6 +399,8 @@ const timeAgo = (iso) => {
 
 <style scoped>
 .post {
+  /* Media height is the main lever on whether a whole post fits on screen. */
+  --media-h: clamp(220px, 42vh, 430px);
   background: #fff;
   border: 1px solid #ece6f0;
   border-radius: 14px;
@@ -407,7 +409,7 @@ const timeAgo = (iso) => {
 .post--agency { border-color: #ddd0e8; }
 
 /* ── Author ─────────────────────────────────────────── */
-.post-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.post-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
 .post-avatar {
   background: linear-gradient(135deg, #7b1fa2, #4a148c);
   color: #fff; font-weight: 700; font-size: 13px; cursor: pointer; flex-shrink: 0;
@@ -441,16 +443,15 @@ const timeAgo = (iso) => {
 
 /* ── Media ──────────────────────────────────────────── */
 .media { position: relative; background: #1a1020; line-height: 0; user-select: none; overflow: hidden; }
-/* A single item keeps its natural height; a carousel gets a uniform frame so
-   slides of different aspect ratios don't leave black bands. */
-.slides { display: flex; transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
-.slide { min-width: 100%; }
-.media-el { width: 100%; max-height: 560px; object-fit: cover; display: block; }
-
-.media--carousel { aspect-ratio: 4 / 5; max-height: 560px; }
-.media--carousel .slides,
-.media--carousel .slide { height: 100%; }
-.media--carousel .media-el { height: 100%; max-height: none; }
+/* Every post uses the same media frame: full card width and a fixed height, so
+   a whole post fits the viewport and mixed aspect ratios don't leave gaps.
+   (aspect-ratio + max-height was shrinking the *width* instead of the height,
+   which is what left the empty strip beside the image.) */
+.media { height: var(--media-h); }
+.slides { display: flex; height: 100%; transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
+.slide { min-width: 100%; height: 100%; }
+.media-el { width: 100%; height: 100%; object-fit: cover; display: block; }
+video.media-el { object-fit: contain; }
 
 .nav {
   position: absolute; top: 50%; transform: translateY(-50%);
@@ -507,10 +508,11 @@ video.media-el { object-fit: contain; background: #000; }
 @keyframes bounce { 0%,100% { height: 3px } 50% { height: 11px } }
 
 /* ── Caption ────────────────────────────────────────── */
-.caption-block { padding: 12px 14px 4px; }
+.caption-block { padding: 10px 14px 2px; }
 .caption {
-  margin: 0; font-size: 13.5px; line-height: 1.5; color: #3a2d42;
+  margin: 0; font-size: 13.5px; line-height: 1.45; color: #3a2d42;
   white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
 .caption-name { font-weight: 600; color: #2b1b33; margin-right: 5px; cursor: pointer; }
 .more-btn { border: 0; background: none; padding: 0; color: #9b8aa5; font: inherit; cursor: pointer; }
@@ -541,7 +543,7 @@ video.media-el { object-fit: contain; background: #000; }
 /* ── Actions: its own bubble ────────────────────────── */
 .action-bar {
   display: flex; align-items: center; justify-content: space-around;
-  margin: 10px 14px 12px; padding: 3px;
+  margin: 8px 14px 10px; padding: 2px;
   border-radius: 999px; background: #f7f3fa; border: 1px solid #f0eaf4;
 }
 .act {
