@@ -14,7 +14,7 @@
         <span class="focus-label">Viewing a single post</span>
       </div>
 
-      <div v-if="focusedId" class="column q-gutter-md">
+      <div v-if="focusedId" class="focus-scroll">
         <div v-if="focusLoading" class="row justify-center q-py-xl">
           <q-spinner-dots color="primary" size="30px" />
         </div>
@@ -91,10 +91,11 @@
         </p>
       </div>
 
-      <div v-else class="column q-gutter-md">
+      <div v-else ref="scroller" class="feed-scroll" @scroll.passive="onScroll">
         <PostCard
           v-for="post in store.posts"
           :key="post.id"
+          class="snap-item"
           :post="post"
           :comments="store.comments[post.id] || []"
           :show-comments="openComments.has(post.id)"
@@ -134,6 +135,7 @@ import { useQuasar } from 'quasar'
 import { api } from 'src/boot/axios'
 import { useAuthStore } from 'src/stores/authStore'
 import { useCommunityStore } from 'src/stores/communityStore'
+import { useFeedAudioStore } from 'src/stores/feedAudioStore'
 import PostCard from 'components/PostCard.vue'
 import PostComposer from 'components/PostComposer.vue'
 import ReportDialog from 'components/ReportDialog.vue'
@@ -145,6 +147,7 @@ import { useRouter, useRoute } from 'vue-router'
 const $q = useQuasar()
 const authStore = useAuthStore()
 const store = useCommunityStore()
+const audioStore = useFeedAudioStore()
 const socialStore = useSocialStore()
 const router = useRouter()
 const route = useRoute()
@@ -296,10 +299,15 @@ const onReport = (post) => {
   reportDialog.value = true
 }
 
-// Infinite scroll: load the next page as the bottom of the feed approaches.
+// Infinite scroll inside the snap container (the window no longer scrolls here).
+const scroller = ref(null)
+
 const onScroll = () => {
-  const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 600
-  if (nearBottom) store.fetchMore(feedFilters.value)
+  const el = scroller.value
+  if (!el) return
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 700) {
+    store.fetchMore(feedFilters.value)
+  }
 }
 
 watch(() => route.query.post, (id) => {
@@ -308,7 +316,6 @@ watch(() => route.query.post, (id) => {
 })
 
 onMounted(async () => {
-  window.addEventListener('scroll', onScroll, { passive: true })
   if (focusedId.value) loadFocused(focusedId.value)
   await store.fetchFeed()
   try {
@@ -319,12 +326,41 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => window.removeEventListener('scroll', onScroll))
+onUnmounted(() => audioStore.stop())
 </script>
 
 <style scoped>
-.feed-page { background: #faf8fc; padding: 24px 16px 64px; }
-.feed-shell { max-width: 680px; margin: 0 auto; }
+.feed-page {
+  background: #faf8fc;
+  padding: 20px 16px 0;
+  /* Fixed height so the feed below can own its own scrolling. */
+  height: calc(100vh - 58px);
+  display: flex;
+  flex-direction: column;
+}
+.feed-shell {
+  max-width: 680px; width: 100%; margin: 0 auto;
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+}
+
+/* Discrete, post-by-post scrolling like Reels — one post settles at a time
+   instead of the feed drifting between two. */
+.feed-scroll {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  padding-bottom: 40vh;   /* lets the last post snap to the top */
+}
+.feed-scroll::-webkit-scrollbar { display: none; }
+
+.snap-item {
+  scroll-snap-align: start;
+  /* Stops a fast flick skipping several posts at once. */
+  scroll-snap-stop: always;
+  margin-bottom: 16px;
+}
 
 .feed-head { margin-bottom: 18px; }
 .focus-bar {
@@ -332,6 +368,14 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
   padding: 6px 10px; border-radius: 999px; background: #f3ecf7; border: 1px solid #e8dcf0;
 }
 .focus-label { font-size: 12px; color: #7a6a82; }
+
+/* One post can easily be taller than the viewport, so this pane scrolls
+   normally — snapping only makes sense when there's a list to snap through. */
+.focus-scroll {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding-bottom: 24px; scrollbar-width: none;
+}
+.focus-scroll::-webkit-scrollbar { display: none; }
 .feed-title { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: #2b1b33; }
 .feed-sub { margin: 4px 0 0; font-size: 14px; color: #7a6a82; }
 

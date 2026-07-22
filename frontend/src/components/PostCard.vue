@@ -1,5 +1,5 @@
 <template>
-  <article class="post" :class="{ 'post--agency': post.author.is_agency }">
+  <article ref="root" class="post" :class="{ 'post--agency': post.author.is_agency }">
     <!-- ── Author ──────────────────────────────────────── -->
     <header class="post-head">
       <q-avatar size="36px" class="post-avatar" @click="goToAuthor">
@@ -79,11 +79,12 @@
         <q-icon v-if="burst" name="favorite" class="burst-heart" />
       </transition>
 
-      <!-- Track credit, like a reel's audio chip -->
-      <button v-if="post.audio" type="button" class="audio-pill" @click="toggleAudio">
-        <q-icon :name="playing ? 'pause' : 'play_arrow'" size="14px" />
-        <span class="audio-pill-text">{{ post.audio.title }} · {{ post.audio.artist }}</span>
-        <span class="eq" :class="{ 'eq--live': playing }"><i /><i /><i /></span>
+      <!-- Track credit. Tapping toggles sound for the whole feed, not just
+           this post — matching how Reels behaves. -->
+      <button v-if="post.audio" type="button" class="audio-pill" @click.stop="audioStore.toggleMute()">
+        <q-icon :name="soundIcon" size="14px" />
+        <span class="audio-pill-text">{{ audioLabel }}</span>
+        <span class="eq" :class="{ 'eq--live': isPlaying }"><i /><i /><i /></span>
       </button>
     </div>
 
@@ -96,7 +97,7 @@
       </p>
 
       <!-- Music without media gets its own compact player -->
-      <button v-if="post.audio && !gallery.length" type="button" class="audio-card" @click="toggleAudio">
+      <button v-if="post.audio && !gallery.length" type="button" class="audio-card" @click="audioStore.toggleMute()">
         <q-avatar size="34px" rounded class="audio-cover">
           <img v-if="post.audio.cover" :src="post.audio.cover" />
           <q-icon v-else name="music_note" size="18px" />
@@ -105,8 +106,8 @@
           <span class="audio-title">{{ post.audio.title }}</span>
           <span class="audio-artist">{{ post.audio.artist }}</span>
         </span>
-        <span class="eq" :class="{ 'eq--live': playing }"><i /><i /><i /></span>
-        <q-icon :name="playing ? 'pause_circle' : 'play_circle'" size="26px" class="audio-play" />
+        <span class="eq" :class="{ 'eq--live': isPlaying }"><i /><i /><i /></span>
+        <q-icon :name="soundIcon" size="24px" class="audio-play" />
       </button>
 
       <!-- Companion posts are a call to action -->
@@ -227,13 +228,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from 'src/stores/authStore'
 import { postType } from 'src/utils/postTypes'
 import { api } from 'src/boot/axios'
 import GifPicker from 'components/GifPicker.vue'
+import { useFeedAudioStore } from 'src/stores/feedAudioStore'
 
 const props = defineProps({
   post: { type: Object, required: true },
@@ -249,6 +251,7 @@ const emit = defineEmits([
 const router = useRouter()
 const $q = useQuasar()
 const authStore = useAuthStore()
+const audioStore = useFeedAudioStore()
 
 const draft = ref('')
 const posting = ref(false)
@@ -293,9 +296,42 @@ const onGifPicked = (gif) => {
 }
 const expanded = ref(false)
 const burst = ref(false)
-const playing = ref(false)
+const root = ref(null)
 
-let audioEl = null
+// This post owns the feed's audio only while it's the one in view.
+const isActive = computed(() => audioStore.activeId === props.post.id)
+const isPlaying = computed(() => isActive.value && audioStore.playing && !audioStore.muted)
+
+const soundIcon = computed(() => {
+  if (audioStore.muted) return 'volume_off'
+  if (audioStore.blocked) return 'touch_app'
+  return 'volume_up'
+})
+
+const audioLabel = computed(() => {
+  if (audioStore.blocked && !audioStore.muted) return 'Tap for sound'
+  return `${props.post.audio?.title} · ${props.post.audio?.artist}`
+})
+
+// A post "takes over" the audio once most of it is on screen.
+let observer = null
+
+onMounted(() => {
+  if (!props.post.audio || !root.value) return
+
+  observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        audioStore.activate(props.post.id, props.post.audio)
+      } else {
+        audioStore.deactivate(props.post.id)
+      }
+    },
+    // 55% keeps handover clean: two posts can't both claim it.
+    { threshold: 0.55 },
+  )
+  observer.observe(root.value)
+})
 
 const meta = computed(() => postType(props.post.type))
 const displayName = computed(() =>
@@ -325,30 +361,10 @@ const onDoubleTap = () => {
   setTimeout(() => (burst.value = false), 700)
 }
 
-const toggleAudio = () => {
-  const url = props.post.audio?.audio_url
-  if (!url) return
-
-  if (!audioEl) {
-    audioEl = new Audio(url)
-    audioEl.addEventListener('ended', () => (playing.value = false))
-  }
-
-  if (playing.value) {
-    audioEl.pause()
-    playing.value = false
-  } else {
-    audioEl.play().then(() => (playing.value = true)).catch(() => {
-      $q.notify({ color: 'negative', message: 'Could not play this track', position: 'top' })
-    })
-  }
-}
-
 onUnmounted(() => {
-  if (audioEl) {
-    audioEl.pause()
-    audioEl = null
-  }
+  observer?.disconnect()
+  // If this card owned the audio, hand it back rather than leaving it playing.
+  audioStore.deactivate(props.post.id)
 })
 
 const submitComment = async () => {
@@ -480,6 +496,7 @@ video.media-el { object-fit: contain; background: #000; }
   color: #fff; font: inherit; font-size: 11.5px; line-height: 1; cursor: pointer;
 }
 .audio-pill-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audio-pill:hover { background: rgba(20, 10, 26, 0.82); }
 
 /* Little equaliser that animates while a track plays */
 .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
