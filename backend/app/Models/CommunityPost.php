@@ -13,7 +13,7 @@ class CommunityPost extends Model
 
     protected $fillable = [
         'user_id', 'destination_id', 'type', 'body',
-        'media_url', 'media_type', 'audio',
+        'media_url', 'media_type', 'gallery', 'audio',
         'is_flagged', 'is_hidden',
     ];
 
@@ -23,6 +23,7 @@ class CommunityPost extends Model
             'is_flagged' => 'boolean',
             'is_hidden'  => 'boolean',
             'audio'      => 'array',
+            'gallery'    => 'array',
         ];
     }
 

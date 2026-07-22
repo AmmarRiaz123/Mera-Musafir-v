@@ -20,6 +20,12 @@ class PostResource extends JsonResource
             'body'           => $this->body,
             'media_url'      => ImageUrl::resolve($this->media_url),
             'media_type'     => $this->media_type,
+            // Always an array, even for older single-image posts.
+            'gallery'        => collect($this->gallery ?: ($this->media_url ? [['url' => $this->media_url, 'type' => $this->media_type ?: 'image']] : []))
+                ->map(fn ($m) => [
+                    'url'  => ImageUrl::resolve($m['url'] ?? null),
+                    'type' => $m['type'] ?? 'image',
+                ])->filter(fn ($m) => !empty($m['url']))->values(),
             'audio'          => $this->audio,
             'likes_count'    => (int) $this->likes_count,
             'comments_count' => (int) $this->comments_count,

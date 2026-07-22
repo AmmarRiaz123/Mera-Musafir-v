@@ -232,7 +232,7 @@ const onToggleComments = async (post) => {
   if (!communityStore.comments[post.id]) await communityStore.fetchComments(post.id)
 }
 
-const onComment = (post, body) => communityStore.addComment(post, body).catch(() => {})
+const onComment = (post, payload) => communityStore.addComment(post, payload).catch(() => {})
 
 // Sharing lives on the Community page — send them there with the post open.
 const onSharePost = (post) => router.push(`/community?post=${post.id}`)

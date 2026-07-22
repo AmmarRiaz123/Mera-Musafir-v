@@ -48,11 +48,17 @@
         />
       </div>
 
-      <!-- Selected media preview -->
-      <div v-if="form.media_url" class="preview">
-        <video v-if="form.media_type === 'video'" :src="previewUrl" class="preview-el" controls preload="metadata" />
-        <img v-else :src="previewUrl" class="preview-el" alt="" />
-        <q-btn round dense unelevated class="preview-remove" icon="close" size="sm" @click="clearMedia" />
+      <!-- Selected media (multiple allowed) -->
+      <div v-if="media.length" class="gallery-strip">
+        <div v-for="(m, i) in media" :key="i" class="tile">
+          <video v-if="m.type === 'video'" :src="m.previewUrl" class="tile-el" preload="metadata" />
+          <img v-else :src="m.previewUrl" class="tile-el" alt="" />
+          <span class="tile-kind" v-if="m.type !== 'image'">{{ m.type.toUpperCase() }}</span>
+          <q-btn round dense unelevated class="tile-x" icon="close" size="xs" @click="media.splice(i, 1)" />
+        </div>
+        <button v-if="media.length < 10" type="button" class="tile tile--add" @click="pickFile">
+          <q-icon name="add" size="22px" />
+        </button>
       </div>
 
       <!-- Selected track -->
@@ -79,7 +85,7 @@
       <!-- Attach bar -->
       <div class="attach-bar">
         <span class="attach-label">Add</span>
-        <button type="button" class="attach" :disabled="uploading" @click="pickFile">
+        <button type="button" class="attach" :disabled="uploading || media.length >= 10" @click="pickFile">
           <q-icon name="image" size="20px" /><span>Photo / Video</span>
         </button>
         <button type="button" class="attach" @click="openGifs">
@@ -105,7 +111,7 @@
         />
       </div>
 
-      <input ref="fileInput" type="file" class="hidden" accept="image/*,video/mp4,video/webm,video/quicktime" @change="onFile" />
+      <input ref="fileInput" type="file" multiple class="hidden" accept="image/*,video/mp4,video/webm,video/quicktime" @change="onFile" />
     </div>
 
     <!-- ── GIF picker ─────────────────────────────────── -->
@@ -218,10 +224,10 @@ const posting = ref(false)
 const uploading = ref(false)
 const fileInput = ref(null)
 
-const form = reactive({
-  body: '', type: 'story', destination_id: null,
-  media_url: null, media_type: null, audio: null,
-})
+const form = reactive({ body: '', type: 'story', destination_id: null, audio: null })
+
+// Up to 10 items: photos, videos and GIFs mixed.
+const media = ref([])
 
 // Agencies get the announcement category; travellers don't.
 const availableTypes = computed(() => (props.isAgency ? POST_TYPES : travellerTypes))
@@ -235,14 +241,9 @@ const bodyPlaceholder = computed(() => ({
   safety:    'What happened, and where?',
 }[form.type] ?? 'Share something with the community…'))
 
-const canPost = computed(() => form.body.trim().length > 0 && !uploading.value)
-
-const previewUrl = computed(() => {
-  if (!form.media_url) return null
-  return /^(https?:|data:)/.test(form.media_url)
-    ? form.media_url
-    : `http://localhost:8000/storage/${form.media_url}`
-})
+const canPost = computed(
+  () => (form.body.trim().length > 0 || media.value.length > 0) && !uploading.value,
+)
 
 // ── Destinations ────────────────────────────────────
 const destinationOptions = ref([])
@@ -259,19 +260,20 @@ const filterDestinations = (val, update) => {
 const pickFile = () => fileInput.value?.click()
 
 const onFile = async (e) => {
-  const file = e.target.files?.[0]
+  const files = Array.from(e.target.files || [])
   e.target.value = ''
-  if (!file) return
+  if (!files.length) return
 
   uploading.value = true
   try {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('type', 'post_media')
-    // Clearing Content-Type lets the browser set the multipart boundary.
-    const { data } = await api.post('/api/v1/uploads', fd, { headers: { 'Content-Type': undefined } })
-    form.media_url = data.path
-    form.media_type = data.media_type
+    for (const file of files.slice(0, 10 - media.value.length)) {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('type', 'post_media')
+      // Clearing Content-Type lets the browser set the multipart boundary.
+      const { data } = await api.post('/api/v1/uploads', fd, { headers: { 'Content-Type': undefined } })
+      media.value.push({ url: data.path, type: data.media_type, previewUrl: data.url })
+    }
   } catch (err) {
     $q.notify({
       color: 'negative', position: 'top',
@@ -280,11 +282,6 @@ const onFile = async (e) => {
   } finally {
     uploading.value = false
   }
-}
-
-const clearMedia = () => {
-  form.media_url = null
-  form.media_type = null
 }
 
 // ── GIF picker ──────────────────────────────────────
@@ -320,8 +317,7 @@ const searchGifs = async () => {
 
 const pickGif = (gif) => {
   // Giphy GIFs are hotlinked, not copied to our storage.
-  form.media_url = gif.url
-  form.media_type = 'gif'
+  media.value.push({ url: gif.url, type: 'gif', previewUrl: gif.url })
   gifDialog.value = false
 }
 
@@ -391,17 +387,19 @@ onUnmounted(stopPreview)
 
 // ── Submit ──────────────────────────────────────────
 const reset = () => {
-  Object.assign(form, {
-    body: '', type: 'story', destination_id: null,
-    media_url: null, media_type: null, audio: null,
-  })
+  Object.assign(form, { body: '', type: 'story', destination_id: null, audio: null })
+  media.value = []
   expanded.value = false
 }
 
 const submit = async () => {
   posting.value = true
   try {
-    const { data } = await api.post('/api/v1/community/posts', { ...form, body: form.body.trim() })
+    const { data } = await api.post('/api/v1/community/posts', {
+      ...form,
+      body: form.body.trim(),
+      gallery: media.value.map(({ url, type }) => ({ url, type })),
+    })
     emit('created', data.data)
     reset()
     $q.notify({ color: 'positive', icon: 'check_circle', message: 'Shared', position: 'top' })
@@ -463,9 +461,26 @@ const submit = async () => {
 .body-wrap:focus-within { border-color: #c9b3d6; background: #fff; }
 .body-input { font-size: 14px; }
 
-.preview { position: relative; margin: 10px 14px 0; border-radius: 11px; overflow: hidden; background: #f2eef5; }
-.preview-el { width: 100%; max-height: 340px; object-fit: cover; display: block; }
-.preview-remove { position: absolute; top: 8px; right: 8px; background: rgba(20, 10, 26, 0.6); color: #fff; }
+.gallery-strip {
+  display: flex; gap: 8px; margin: 10px 14px 0;
+  overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
+}
+.gallery-strip::-webkit-scrollbar { display: none; }
+.tile {
+  position: relative; width: 92px; height: 92px; flex-shrink: 0;
+  border-radius: 10px; overflow: hidden; background: #f2eef5; border: 1px solid #ece6f0;
+}
+.tile-el { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile-kind {
+  position: absolute; left: 4px; bottom: 4px; padding: 1px 5px; border-radius: 4px;
+  background: rgba(20, 10, 26, 0.7); color: #fff; font-size: 8.5px; font-weight: 700;
+}
+.tile-x { position: absolute; top: 3px; right: 3px; background: rgba(20, 10, 26, 0.6); color: #fff; }
+.tile--add {
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px dashed #d9cfe2; background: #fcfafd; color: #9b8aa5; cursor: pointer;
+}
+.tile--add:hover { border-color: var(--q-primary); color: var(--q-primary); }
 
 .track-chip {
   display: flex; align-items: center; gap: 7px; margin: 10px 14px 0;

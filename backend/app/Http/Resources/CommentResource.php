@@ -15,6 +15,8 @@ class CommentResource extends JsonResource
         return [
             'id'         => $this->id,
             'body'       => $this->body,
+            'media_url'  => ImageUrl::resolve($this->media_url),
+            'media_type' => $this->media_type,
             'created_at' => $this->created_at?->toDateTimeString(),
             'can_delete' => $authUser
                 ? ($authUser->id === $this->user_id || $authUser->id === $this->post?->user_id)

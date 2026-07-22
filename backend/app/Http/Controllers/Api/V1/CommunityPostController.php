@@ -45,10 +45,19 @@ class CommunityPostController extends Controller
 
     public function store(StorePostRequest $request)
     {
+        $data = $request->validated();
+
+        // media_url/media_type mirror the gallery's first item so single-media
+        // consumers (share cards, previews) keep working unchanged.
+        if (!empty($data['gallery'])) {
+            $data['media_url']  = $data['gallery'][0]['url'];
+            $data['media_type'] = $data['gallery'][0]['type'];
+        }
+
         $post = CommunityPost::create([
-            ...$request->validated(),
+            ...$data,
             'user_id' => $request->user()->id,
-            'type'    => $request->validated()['type'] ?? 'story',
+            'type'    => $data['type'] ?? 'story',
         ]);
 
         $post->load(['author', 'destination']);
@@ -114,7 +123,14 @@ class CommunityPostController extends Controller
             'media_type'   => $post->media_type,
             'author_id'    => $post->user_id,
             'author_name'  => $post->author?->name,
+            'author_avatar'=> ImageUrl::resolve($post->author?->avatar),
             'destination'  => $post->destination?->name,
+            'media_count'  => count($post->gallery ?: ($post->media_url ? [1] : [])),
+            'audio'        => $post->audio ? [
+                'title'  => $post->audio['title'] ?? null,
+                'artist' => $post->audio['artist'] ?? null,
+                'cover'  => $post->audio['cover'] ?? null,
+            ] : null,
         ];
 
         $sent    = 0;

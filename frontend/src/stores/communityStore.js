@@ -80,14 +80,21 @@ export const useCommunityStore = defineStore('community', {
       }
     },
 
+    async fetchPost(id) {
+      const { data } = await api.get(`/api/v1/community/posts/${id}`)
+      return data.data
+    },
+
     async fetchComments(postId) {
       const { data } = await api.get(`/api/v1/community/posts/${postId}/comments`)
       this.comments[postId] = data.data
       return data.data
     },
 
-    async addComment(post, body) {
-      const { data } = await api.post(`/api/v1/community/posts/${post.id}/comments`, { body })
+    async addComment(post, payload) {
+      // Accepts a plain string (text only) or { body, media_url, media_type }.
+      const body = typeof payload === 'string' ? { body: payload } : payload
+      const { data } = await api.post(`/api/v1/community/posts/${post.id}/comments`, body)
       if (!this.comments[post.id]) this.comments[post.id] = []
       this.comments[post.id].push(data.data)
       post.comments_count = data.comments_count

@@ -8,6 +8,40 @@
         </div>
       </header>
 
+      <!-- Deep-linked single post (from a shared card) -->
+      <div v-if="focusedId" class="focus-bar">
+        <q-btn flat dense no-caps color="primary" icon="arrow_back" label="Back to feed" @click="clearFocus" />
+        <span class="focus-label">Viewing a single post</span>
+      </div>
+
+      <div v-if="focusedId" class="column q-gutter-md">
+        <div v-if="focusLoading" class="row justify-center q-py-xl">
+          <q-spinner-dots color="primary" size="30px" />
+        </div>
+        <div v-else-if="!focusedPost" class="empty-block">
+          <q-icon name="search_off" size="46px" />
+          <div class="empty-title">Post not found</div>
+          <p class="empty-text">It may have been deleted or is no longer available.</p>
+          <q-btn flat no-caps color="primary" label="Back to feed" @click="clearFocus" />
+        </div>
+        <PostCard
+          v-else
+          :post="focusedPost"
+          :comments="store.comments[focusedPost.id] || []"
+          :show-comments="true"
+          :loading-comments="loadingComments === focusedPost.id"
+          @like="onLike"
+          @toggle-comments="onToggleComments"
+          @comment="onComment"
+          @delete="onDelete"
+          @report="onReport"
+          @delete-comment="onDeleteComment"
+          @message-author="onMessageAuthor"
+          @share="onShare"
+        />
+      </div>
+
+      <template v-else>
       <PostComposer
         v-if="authStore.isLoggedIn"
         :destinations="allDestinations"
@@ -80,6 +114,7 @@
         </div>
         <div v-else-if="!store.hasMore" class="feed-end">You're all caught up.</div>
       </div>
+      </template>
     </div>
 
     <SharePostDialog v-model="shareDialog" :post="shareTarget" />
@@ -94,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from 'src/boot/axios'
 import { useAuthStore } from 'src/stores/authStore'
@@ -105,13 +140,14 @@ import ReportDialog from 'components/ReportDialog.vue'
 import SharePostDialog from 'components/SharePostDialog.vue'
 import { POST_TYPES } from 'src/utils/postTypes'
 import { useSocialStore } from 'src/stores/socialStore'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 const $q = useQuasar()
 const authStore = useAuthStore()
 const store = useCommunityStore()
 const socialStore = useSocialStore()
 const router = useRouter()
+const route = useRoute()
 
 const isAgency = computed(() => authStore.user?.type === 'agency')
 
@@ -136,6 +172,33 @@ const allDestinations = ref([])
 const activeType = ref(null)
 const openComments = ref(new Set())
 const loadingComments = ref(null)
+const focusedId = ref(route.query.post ? Number(route.query.post) : null)
+const focusedPost = ref(null)
+const focusLoading = ref(false)
+
+// A shared card links to ?post=<id> — load just that post and pin it.
+const loadFocused = async (id) => {
+  if (!id) {
+    focusedPost.value = null
+    return
+  }
+  focusLoading.value = true
+  try {
+    focusedPost.value = await store.fetchPost(id)
+    if (!store.comments[id]) await store.fetchComments(id)
+  } catch {
+    focusedPost.value = null
+  } finally {
+    focusLoading.value = false
+  }
+}
+
+const clearFocus = () => {
+  focusedId.value = null
+  focusedPost.value = null
+  router.replace({ query: {} })
+}
+
 const shareDialog = ref(false)
 const shareTarget = ref(null)
 const reportDialog = ref(false)
@@ -180,14 +243,16 @@ const onToggleComments = async (post) => {
   }
 }
 
-const onComment = async (post, body) => {
+const onComment = async (post, payload) => {
   try {
-    await store.addComment(post, body)
+    await store.addComment(post, payload)
   } catch (err) {
     $q.notify({
       color: 'negative',
       position: 'top',
-      message: err.response?.data?.errors?.body?.[0] || 'Could not add comment',
+      message: err.response?.data?.errors?.body?.[0]
+            || err.response?.data?.message
+            || 'Could not add comment',
     })
   }
 }
@@ -237,8 +302,14 @@ const onScroll = () => {
   if (nearBottom) store.fetchMore(feedFilters.value)
 }
 
+watch(() => route.query.post, (id) => {
+  focusedId.value = id ? Number(id) : null
+  loadFocused(focusedId.value)
+})
+
 onMounted(async () => {
   window.addEventListener('scroll', onScroll, { passive: true })
+  if (focusedId.value) loadFocused(focusedId.value)
   await store.fetchFeed()
   try {
     const r = await api.get('/api/v1/destinations', { params: { per_page: 100 } })
@@ -256,6 +327,11 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 .feed-shell { max-width: 680px; margin: 0 auto; }
 
 .feed-head { margin-bottom: 18px; }
+.focus-bar {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+  padding: 6px 10px; border-radius: 999px; background: #f3ecf7; border: 1px solid #e8dcf0;
+}
+.focus-label { font-size: 12px; color: #7a6a82; }
 .feed-title { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; color: #2b1b33; }
 .feed-sub { margin: 4px 0 0; font-size: 14px; color: #7a6a82; }
 

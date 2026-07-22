@@ -53,22 +53,47 @@
             </div>
 
             <div v-else class="share-card" @click="openSharedPost(msg)">
-              <div class="share-media">
-                <img v-if="msg.metadata?.media_url && msg.metadata?.media_type !== 'video'" :src="msg.metadata.media_url" alt="" />
-                <q-icon v-else-if="msg.metadata?.media_type === 'video'" name="movie" size="22px" />
-                <q-icon v-else name="article" size="22px" />
+              <!-- Big media preview, like a link card -->
+              <div v-if="msg.metadata?.media_url" class="sc-hero">
+                <img v-if="msg.metadata?.media_type !== 'video'" :src="msg.metadata.media_url" alt="" />
+                <div v-else class="sc-video"><q-icon name="play_circle" size="34px" /></div>
+                <span v-if="msg.metadata?.media_count > 1" class="sc-count">
+                  <q-icon name="collections" size="11px" />{{ msg.metadata.media_count }}
+                </span>
               </div>
-              <div class="share-text">
-                <div class="share-label">
-                  <q-icon name="forum" size="12px" />Community post
+
+              <div class="sc-body">
+                <div class="sc-label"><q-icon name="forum" size="11px" />Community post</div>
+
+                <div class="sc-author">
+                  <q-avatar size="20px" class="sc-avatar">
+                    <img v-if="msg.metadata?.author_avatar" :src="msg.metadata.author_avatar" />
+                    <span v-else>{{ msg.metadata?.author_name?.[0]?.toUpperCase() }}</span>
+                  </q-avatar>
+                  <span class="sc-name">{{ msg.metadata?.author_name }}</span>
                 </div>
-                <div class="share-author">{{ msg.metadata?.author_name }}</div>
-                <div class="share-excerpt">{{ msg.metadata?.excerpt }}</div>
-                <div v-if="msg.metadata?.destination" class="share-dest">
-                  <q-icon name="place" size="11px" />{{ msg.metadata.destination }}
+
+                <div class="sc-excerpt">{{ msg.metadata?.excerpt }}</div>
+
+                <!-- Track preview -->
+                <div v-if="msg.metadata?.audio" class="sc-audio">
+                  <q-avatar size="24px" rounded class="sc-audio-cover">
+                    <img v-if="msg.metadata.audio.cover" :src="msg.metadata.audio.cover" />
+                    <q-icon v-else name="music_note" size="13px" />
+                  </q-avatar>
+                  <span class="sc-audio-text">
+                    {{ msg.metadata.audio.title }} · {{ msg.metadata.audio.artist }}
+                  </span>
+                  <q-icon name="graphic_eq" size="13px" />
+                </div>
+
+                <div class="sc-foot">
+                  <span v-if="msg.metadata?.destination" class="sc-dest">
+                    <q-icon name="place" size="11px" />{{ msg.metadata.destination }}
+                  </span>
+                  <span class="sc-open">View post<q-icon name="chevron_right" size="14px" /></span>
                 </div>
               </div>
-              <q-icon name="chevron_right" size="18px" class="share-arrow" />
             </div>
 
             <div v-if="msg.body && msg.body !== 'Shared a post'" class="share-note">{{ msg.body }}</div>
@@ -464,14 +489,71 @@ onUnmounted(() => {
 /* ── Shared community post ──────────────────────────── */
 .share-wrap { max-width: 330px; }
 .share-card {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 10px; border-radius: 13px; cursor: pointer;
+  border-radius: 14px; overflow: hidden; cursor: pointer;
   background: #fff; border: 1px solid #e6dcee;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
-.share-card:hover { border-color: #c9b3d6; transform: translateY(-1px); }
+.share-card:hover {
+  border-color: #c9b3d6; transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(43, 27, 51, 0.09);
+}
 .share-card--gone {
+  display: flex; align-items: center; gap: 10px; padding: 12px;
   cursor: default; background: #f5f2f7; border-color: #e8e0ee; color: #8a7a92;
+}
+
+.sc-hero { position: relative; height: 150px; background: #1a1020; line-height: 0; }
+.sc-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sc-video {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #4a148c, #1a1020); color: rgba(255,255,255,0.85);
+}
+.sc-count {
+  position: absolute; top: 8px; right: 8px;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(20, 10, 26, 0.68); color: #fff; font-size: 10px; line-height: 1.4;
+}
+
+.sc-body { padding: 10px 12px 11px; }
+.sc-label {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #9b8aa5;
+}
+.sc-author { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.sc-avatar {
+  background: linear-gradient(135deg, #7b1fa2, #4a148c);
+  color: #fff; font-size: 9px; font-weight: 700;
+}
+.sc-name { font-size: 12.5px; font-weight: 600; color: #2b1b33; }
+.sc-excerpt {
+  font-size: 12px; color: #6b5a75; line-height: 1.4; margin-top: 4px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.sc-audio {
+  display: flex; align-items: center; gap: 7px; margin-top: 8px;
+  padding: 5px 8px; border-radius: 8px;
+  background: linear-gradient(120deg, #f7f0fa, #efe7f6); color: #4a148c;
+}
+.sc-audio-cover { background: #4a148c; color: #fff; flex-shrink: 0; }
+.sc-audio-text {
+  flex: 1; min-width: 0; font-size: 11px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sc-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-top: 9px; padding-top: 8px; border-top: 1px solid #f4eff7;
+}
+.sc-dest {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 11px; color: #7a6a82; font-weight: 500;
+}
+.sc-open {
+  display: inline-flex; align-items: center; gap: 1px; margin-left: auto;
+  font-size: 11.5px; font-weight: 600; color: var(--q-primary);
 }
 .share-card--gone:hover { transform: none; border-color: #e8e0ee; }
 .gone-title { font-size: 12.5px; font-weight: 600; color: #6b5a75; }

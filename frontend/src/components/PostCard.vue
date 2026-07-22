@@ -45,12 +45,35 @@
     </header>
 
     <!-- ── Media ───────────────────────────────────────── -->
-    <div v-if="post.media_url" class="media" @dblclick="onDoubleTap">
-      <video
-        v-if="post.media_type === 'video'"
-        :src="post.media_url" class="media-el" controls playsinline preload="metadata"
-      />
-      <img v-else :src="post.media_url" class="media-el" alt="" />
+    <div
+      v-if="gallery.length"
+      class="media"
+      :class="{ 'media--carousel': gallery.length > 1 }"
+      @dblclick="onDoubleTap"
+    >
+      <div class="slides" :style="{ transform: `translateX(-${slide * 100}%)` }">
+        <div v-for="(m, i) in gallery" :key="i" class="slide">
+          <video
+            v-if="m.type === 'video'"
+            :src="m.url" class="media-el" controls playsinline preload="metadata"
+          />
+          <img v-else :src="m.url" class="media-el" alt="" />
+        </div>
+      </div>
+
+      <!-- Carousel controls, only when there's more than one -->
+      <template v-if="gallery.length > 1">
+        <button v-if="slide > 0" type="button" class="nav nav--prev" @click.stop="slide--">
+          <q-icon name="chevron_left" size="20px" />
+        </button>
+        <button v-if="slide < gallery.length - 1" type="button" class="nav nav--next" @click.stop="slide++">
+          <q-icon name="chevron_right" size="20px" />
+        </button>
+        <span class="count-pill">{{ slide + 1 }}/{{ gallery.length }}</span>
+        <div class="dots">
+          <span v-for="(m, i) in gallery" :key="i" class="dot-i" :class="{ 'dot-i--on': i === slide }" @click.stop="slide = i" />
+        </div>
+      </template>
 
       <transition name="burst">
         <q-icon v-if="burst" name="favorite" class="burst-heart" />
@@ -73,7 +96,7 @@
       </p>
 
       <!-- Music without media gets its own compact player -->
-      <button v-if="post.audio && !post.media_url" type="button" class="audio-card" @click="toggleAudio">
+      <button v-if="post.audio && !gallery.length" type="button" class="audio-card" @click="toggleAudio">
         <q-avatar size="34px" rounded class="audio-cover">
           <img v-if="post.audio.cover" :src="post.audio.cover" />
           <q-icon v-else name="music_note" size="18px" />
@@ -143,7 +166,8 @@
                 <q-icon v-if="c.author.is_verified" name="verified" size="11px" color="deep-purple" />
                 <span class="bubble-time">{{ timeAgo(c.created_at) }}</span>
               </div>
-              <div class="bubble-body">{{ c.body }}</div>
+              <div v-if="c.body" class="bubble-body">{{ c.body }}</div>
+              <img v-if="c.media_url" :src="c.media_url" class="bubble-media" alt="" />
             </div>
 
             <q-btn
@@ -158,26 +182,47 @@
             <span>No comments yet — say something nice.</span>
           </div>
 
-          <div v-if="authStore.isLoggedIn" class="compose">
-            <q-avatar size="28px" class="comment-avatar">
-              <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" />
-              <span v-else>{{ authStore.user?.name?.[0]?.toUpperCase() }}</span>
-            </q-avatar>
-            <input
-              v-model="draft"
-              class="compose-input"
-              placeholder="Add a comment…"
-              maxlength="1000"
-              @keyup.enter="submitComment"
-            />
-            <q-btn
-              flat dense no-caps color="primary" label="Post"
-              :disable="!draft.trim()" :loading="posting" @click="submitComment"
-            />
+          <div v-if="authStore.isLoggedIn" class="compose-wrap">
+            <!-- Attachment preview -->
+            <div v-if="attachment" class="attach-preview">
+              <img :src="attachment.previewUrl || attachment.url" alt="" />
+              <q-btn round dense unelevated size="xs" icon="close" class="attach-x" @click="attachment = null" />
+            </div>
+
+            <div class="compose">
+              <q-avatar size="28px" class="comment-avatar">
+                <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" />
+                <span v-else>{{ authStore.user?.name?.[0]?.toUpperCase() }}</span>
+              </q-avatar>
+              <input
+                v-model="draft"
+                class="compose-input"
+                :placeholder="attachment ? 'Add a caption (optional)…' : 'Add a comment…'"
+                maxlength="1000"
+                @keyup.enter="submitComment"
+              />
+              <button type="button" class="compose-icon" :disabled="uploading" @click="pickCommentPhoto">
+                <q-icon name="image" size="18px" />
+                <q-tooltip>Photo</q-tooltip>
+              </button>
+              <button type="button" class="compose-icon" @click="gifDialog = true">
+                <q-icon name="gif_box" size="18px" />
+                <q-tooltip>GIF</q-tooltip>
+              </button>
+              <q-spinner v-if="uploading" color="primary" size="18px" />
+              <q-btn
+                v-else
+                flat dense no-caps color="primary" label="Post"
+                :disable="!canComment" :loading="posting" @click="submitComment"
+              />
+            </div>
+
+            <input ref="commentFile" type="file" class="hidden" accept="image/*" @change="onCommentFile" />
           </div>
         </template>
       </section>
     </transition>
+    <GifPicker v-model="gifDialog" @picked="onGifPicked" />
   </article>
 </template>
 
@@ -187,6 +232,8 @@ import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useAuthStore } from 'src/stores/authStore'
 import { postType } from 'src/utils/postTypes'
+import { api } from 'src/boot/axios'
+import GifPicker from 'components/GifPicker.vue'
 
 const props = defineProps({
   post: { type: Object, required: true },
@@ -205,6 +252,45 @@ const authStore = useAuthStore()
 
 const draft = ref('')
 const posting = ref(false)
+const slide = ref(0)
+const attachment = ref(null)
+const uploading = ref(false)
+const gifDialog = ref(false)
+const commentFile = ref(null)
+
+// Older posts only have media_url; the resource normalises both into `gallery`.
+const gallery = computed(() => props.post.gallery || [])
+
+const canComment = computed(() => !!draft.value.trim() || !!attachment.value)
+
+const pickCommentPhoto = () => commentFile.value?.click()
+
+const onCommentFile = async (e) => {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+
+  uploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('type', 'post_media')
+    // Clearing Content-Type lets the browser set the multipart boundary.
+    const { data } = await api.post('/api/v1/uploads', fd, { headers: { 'Content-Type': undefined } })
+    attachment.value = { url: data.path, type: data.media_type === 'gif' ? 'gif' : 'image', previewUrl: data.url }
+  } catch (err) {
+    $q.notify({
+      color: 'negative', position: 'top',
+      message: err.response?.data?.errors?.file?.[0] || 'Could not attach that image',
+    })
+  } finally {
+    uploading.value = false
+  }
+}
+
+const onGifPicked = (gif) => {
+  attachment.value = { url: gif.url, type: 'gif', previewUrl: gif.url }
+}
 const expanded = ref(false)
 const burst = ref(false)
 const playing = ref(false)
@@ -266,12 +352,16 @@ onUnmounted(() => {
 })
 
 const submitComment = async () => {
-  const body = draft.value.trim()
-  if (!body || posting.value) return
+  if (!canComment.value || posting.value) return
   posting.value = true
   try {
-    await emit('comment', props.post, body)
+    await emit('comment', props.post, {
+      body: draft.value.trim() || null,
+      media_url: attachment.value?.url || null,
+      media_type: attachment.value?.type || null,
+    })
     draft.value = ''
+    attachment.value = null
   } finally {
     posting.value = false
   }
@@ -334,8 +424,38 @@ const timeAgo = (iso) => {
 .type-inline--deep { color: #4a148c; }
 
 /* ── Media ──────────────────────────────────────────── */
-.media { position: relative; background: #1a1020; line-height: 0; user-select: none; }
+.media { position: relative; background: #1a1020; line-height: 0; user-select: none; overflow: hidden; }
+/* A single item keeps its natural height; a carousel gets a uniform frame so
+   slides of different aspect ratios don't leave black bands. */
+.slides { display: flex; transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
+.slide { min-width: 100%; }
 .media-el { width: 100%; max-height: 560px; object-fit: cover; display: block; }
+
+.media--carousel { aspect-ratio: 4 / 5; max-height: 560px; }
+.media--carousel .slides,
+.media--carousel .slide { height: 100%; }
+.media--carousel .media-el { height: 100%; max-height: none; }
+
+.nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 30px; height: 30px; border: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.88); color: #2b1b33; cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.18);
+}
+.nav--prev { left: 8px; }
+.nav--next { right: 8px; }
+.count-pill {
+  position: absolute; top: 10px; right: 10px;
+  padding: 3px 9px; border-radius: 999px;
+  background: rgba(20, 10, 26, 0.66); color: #fff; font-size: 11px; line-height: 1.3;
+}
+.dots { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 5px; }
+.dot-i {
+  width: 6px; height: 6px; border-radius: 50%; cursor: pointer;
+  background: rgba(255, 255, 255, 0.5); transition: background 0.15s ease;
+}
+.dot-i--on { background: #fff; }
 video.media-el { object-fit: contain; background: #000; }
 
 .burst-heart {
@@ -444,13 +564,31 @@ video.media-el { object-fit: contain; background: #000; }
 .bubble-name { font-size: 12.5px; font-weight: 600; color: #2b1b33; }
 .bubble-time { font-size: 10.5px; color: #b0a3b8; margin-left: auto; }
 .bubble-body { font-size: 13px; line-height: 1.45; color: #3a2d42; margin-top: 2px; overflow-wrap: anywhere; }
+.bubble-media {
+  display: block; margin-top: 6px; max-width: 220px; max-height: 200px;
+  border-radius: 10px; border: 1px solid #efe9f3;
+}
 .bubble-remove { align-self: center; }
 
+.compose-wrap { margin-top: 10px; }
+.attach-preview { position: relative; display: inline-block; margin-bottom: 8px; }
+.attach-preview img {
+  max-height: 110px; max-width: 180px; border-radius: 10px; display: block;
+  border: 1px solid #e8e0ee;
+}
+.attach-x { position: absolute; top: 4px; right: 4px; background: rgba(20, 10, 26, 0.6); color: #fff; }
+
 .compose {
-  display: flex; align-items: center; gap: 9px;
-  margin-top: 10px; padding: 4px 4px 4px 4px;
+  display: flex; align-items: center; gap: 7px; padding: 4px;
   border-radius: 999px; background: #fff; border: 1px solid #e8e0ee;
 }
+.compose-icon {
+  display: inline-flex; padding: 5px; border: 0; border-radius: 50%;
+  background: transparent; color: #9b8aa5; cursor: pointer; transition: all 0.14s ease;
+}
+.compose-icon:hover:not(:disabled) { background: #f5eef8; color: var(--q-primary); }
+.compose-icon:disabled { opacity: 0.4; cursor: not-allowed; }
+.hidden { display: none; }
 .compose-input {
   flex: 1; min-width: 0; border: 0; outline: none; background: transparent;
   font: inherit; font-size: 13px; color: #3a2d42; padding: 5px 0;

@@ -14,12 +14,18 @@ class StoreCommentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['required', 'string', 'max:1000'],
+            // A comment can be text, media, or both — but not empty.
+            'body'       => ['nullable', 'required_without:media_url', 'string', 'max:1000'],
+            'media_url'  => ['nullable', 'required_without:body', 'string', 'max:2048'],
+            'media_type' => ['nullable', 'in:image,gif'],
         ];
     }
 
     public function messages(): array
     {
-        return ['body.required' => 'Write a comment first.'];
+        return [
+            'body.required_without'      => 'Write something or attach an image.',
+            'media_url.required_without' => 'Write something or attach an image.',
+        ];
     }
 }

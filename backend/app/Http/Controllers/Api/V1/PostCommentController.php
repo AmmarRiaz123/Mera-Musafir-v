@@ -37,10 +37,14 @@ class PostCommentController extends Controller
             return response()->json(['message' => 'This post is no longer available'], 404);
         }
 
+        $data = $request->validated();
+
         $comment = PostComment::create([
             'community_post_id' => $post->id,
             'user_id'           => $request->user()->id,
-            'body'              => $request->validated()['body'],
+            'body'              => $data['body'] ?? null,
+            'media_url'         => $data['media_url'] ?? null,
+            'media_type'        => $data['media_type'] ?? null,
         ]);
 
         $this->feed->syncCounters($post);
