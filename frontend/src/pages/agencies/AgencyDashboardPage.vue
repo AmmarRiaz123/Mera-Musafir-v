@@ -104,7 +104,7 @@
               <div class="queue-amount">PKR {{ fmt(b.total_amount) }}</div>
               <div class="queue-actions">
                 <q-btn
-                  unelevated dense no-caps size="sm" color="positive" label="Confirm"
+                  unelevated dense no-caps size="sm" color="positive" label="Approve"
                   :loading="confirmingId === b.id" @click="doConfirm(b)"
                 />
                 <q-btn
@@ -253,7 +253,8 @@
           <q-icon name="book_online" size="46px" />
           <div class="empty-title">No {{ bookingFilter === 'all' ? '' : bookingFilter }} bookings</div>
           <p class="empty-text">
-            Bookings appear here as travelers reserve your packages. Confirm one to open its group chat.
+            Bookings appear here as travellers request your packages. Approve one and they can pay —
+            the group chat opens once payment clears.
           </p>
         </div>
 
@@ -290,7 +291,7 @@
             <div class="bt-actions">
               <q-btn
                 v-if="b.status === 'pending'"
-                unelevated dense no-caps size="sm" color="positive" label="Confirm"
+                unelevated dense no-caps size="sm" color="positive" label="Approve"
                 :loading="confirmingId === b.id" @click="doConfirm(b)"
               />
               <q-btn
@@ -485,7 +486,8 @@ const sections = [
 const bookingFilters = [
   { value: 'all',       label: 'All' },
   { value: 'pending',   label: 'Pending' },
-  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'approved', label: 'Awaiting payment' },
+  { value: 'confirmed', label: 'Paid' },
   { value: 'cancelled', label: 'Cancelled' },
 ]
 
@@ -679,10 +681,13 @@ const doConfirm = async (booking) => {
   confirmingId.value = booking.id
   try {
     await store.confirmBooking(booking.package?.slug, booking.id)
-    $q.notify({ color: 'positive', icon: 'check_circle', message: 'Booking confirmed — group chat is open', position: 'top' })
+    $q.notify({
+      color: 'positive', icon: 'check_circle', position: 'top',
+      message: 'Approved — the traveller has 48 hours to pay.',
+    })
     await refreshAll()
   } catch (err) {
-    $q.notify({ color: 'negative', message: err.response?.data?.message || 'Failed to confirm', icon: 'error', position: 'top' })
+    $q.notify({ color: 'negative', message: err.response?.data?.message || 'Could not approve that booking', icon: 'error', position: 'top' })
   } finally {
     confirmingId.value = null
   }

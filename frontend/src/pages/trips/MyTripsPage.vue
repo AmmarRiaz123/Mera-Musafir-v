@@ -187,16 +187,32 @@
 
               <div class="column items-end q-gutter-sm">
                 <q-badge :color="bookingColor(b.status)" class="q-px-sm q-py-xs capitalize">
-                  {{ b.status }}
+                  {{ statusLabel(b) }}
                 </q-badge>
+
+                <!-- Approved and unpaid is the one state that needs an action. -->
+                <template v-if="b.awaiting_payment">
+                  <q-btn
+                    unelevated dense no-caps size="sm" rounded
+                    color="deep-purple" icon="lock" label="Pay now"
+                    :to="`/checkout?type=booking&id=${b.id}`"
+                  />
+                  <span v-if="b.payment_due_at" class="text-caption" :class="dueClass(b)">
+                    {{ dueLabel(b) }}
+                  </span>
+                </template>
+
                 <q-btn
-                  v-if="b.status === 'confirmed' && b.package?.trip_id"
+                  v-else-if="b.status === 'confirmed' && b.package?.trip_id"
                   unelevated dense no-caps size="sm"
                   color="deep-purple" icon="forum" label="Group chat"
                   :to="`/trips/${b.package.trip_id}/chat`"
                 />
                 <span v-else-if="b.status === 'confirmed'" class="text-caption text-grey-6">
                   Group chat soon
+                </span>
+                <span v-else-if="b.status === 'pending'" class="text-caption text-grey-6">
+                  Waiting on the agency
                 </span>
               </div>
             </div>
@@ -231,7 +247,26 @@ const formatDate = (dateStr) => {
 const fmtNum = (n) => Number(n || 0).toLocaleString()
 
 const bookingColor = (s) =>
-  ({ pending: 'orange', confirmed: 'positive', cancelled: 'negative', completed: 'blue' }[s] ?? 'grey')
+  ({ pending: 'orange', approved: 'deep-purple', confirmed: 'positive', cancelled: 'negative', completed: 'blue' }[s] ?? 'grey')
+
+// "Approved" alone reads like it's done, when the traveller still owes money.
+const statusLabel = (b) => (b.awaiting_payment ? 'Payment due' : b.status)
+
+const hoursLeft = (b) =>
+  b.payment_due_at
+    ? (new Date(b.payment_due_at.replace(' ', 'T')) - Date.now()) / 36e5
+    : null
+
+const dueLabel = (b) => {
+  const h = hoursLeft(b)
+  if (h === null) return ''
+  if (h <= 0) return 'Window closed'
+  if (h < 1) return `${Math.ceil(h * 60)} min left`
+  if (h < 24) return `${Math.floor(h)}h left to pay`
+  return `${Math.floor(h / 24)}d left to pay`
+}
+
+const dueClass = (b) => ((hoursLeft(b) ?? 99) < 12 ? 'text-negative' : 'text-grey-6')
 
 const loadBookings = async () => {
   bookingsLoading.value = true

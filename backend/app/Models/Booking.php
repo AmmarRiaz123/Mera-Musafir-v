@@ -12,6 +12,7 @@ class Booking extends Model
     protected $fillable = [
         'user_id', 'agency_package_id', 'travelers_count', 'total_amount',
         'status', 'payment_status', 'notes', 'confirmed_at', 'cancelled_at',
+        'approved_at', 'payment_due_at',
     ];
 
     protected $casts = [
@@ -19,6 +20,8 @@ class Booking extends Model
         'total_amount'    => 'integer',
         'confirmed_at'    => 'datetime',
         'cancelled_at'    => 'datetime',
+        'approved_at'     => 'datetime',
+        'payment_due_at'  => 'datetime',
     ];
 
     public function user()

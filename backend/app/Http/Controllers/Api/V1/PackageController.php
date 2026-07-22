@@ -206,6 +206,11 @@ class PackageController extends Controller
     // POST /packages/{package}/book — auth:sanctum
     public function book(Request $request, AgencyPackage $package)
     {
+        // Hand back any seats held by approved bookings nobody paid for, so
+        // capacity is honest before we check whether there's room.
+        app(BookingService::class)->expireUnpaid($package->id);
+        $package->refresh();
+
         if ($package->status !== 'published') {
             return response()->json(['message' => 'This package is not available for booking'], 422);
         }
@@ -247,7 +252,7 @@ class PackageController extends Controller
         $booking->load('agencyPackage');
 
         return response()->json([
-            'message' => 'Booking created. Waiting for agency confirmation.',
+            'message' => 'Request sent. The agency will review it before you pay.',
             'data'    => new BookingResource($booking),
         ], 201);
     }
@@ -276,12 +281,16 @@ class PackageController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        // Confirming and seating the traveller lives in the service, because
-        // a settled payment has to do exactly the same thing.
-        app(BookingService::class)->confirm($booking);
+        if ($booking->status === 'cancelled') {
+            return response()->json(['message' => 'That booking was cancelled.'], 422);
+        }
+
+        // Approval is the agency's vet, not the end of the process: it opens a
+        // payment window. The traveller is seated once they actually pay.
+        app(BookingService::class)->approve($booking);
 
         return response()->json([
-            'message' => 'Booking confirmed',
+            'message' => 'Booking approved — the traveller can now pay.',
             'data'    => new BookingResource($booking),
         ]);
     }

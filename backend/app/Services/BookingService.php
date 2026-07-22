@@ -17,13 +17,61 @@ use App\Models\TripMember;
  */
 class BookingService
 {
+    /** How long an approved traveller has to pay before the seat goes back. */
+    public const PAYMENT_WINDOW_HOURS = 48;
+
+    /**
+     * The agency vets first: approving opens a payment window but seats nobody.
+     *
+     * Money only changes hands once a human at the agency has said yes, so a
+     * declined booking never has to be refunded — which matters while JazzCash
+     * and EasyPaisa refunds are a manual trip to their merchant portal.
+     */
+    public function approve(Booking $booking): Booking
+    {
+        if (!in_array($booking->status, ['pending', 'approved'], true)) {
+            return $booking;
+        }
+
+        $booking->update([
+            'status'         => 'approved',
+            'approved_at'    => $booking->approved_at ?? now(),
+            'payment_due_at' => now()->addHours(self::PAYMENT_WINDOW_HOURS),
+        ]);
+
+        return $booking;
+    }
+
+    /**
+     * Release approved bookings nobody paid for.
+     *
+     * An approved seat is capacity held against the package, so leaving it
+     * open forever would let a package sell out to people who never paid.
+     * Called lazily wherever bookings are read, and by bookings:expire.
+     */
+    public function expireUnpaid(?int $packageId = null): int
+    {
+        $stale = Booking::where('status', 'approved')
+            ->where('payment_status', 'unpaid')
+            ->whereNotNull('payment_due_at')
+            ->where('payment_due_at', '<', now())
+            ->when($packageId, fn ($q) => $q->where('agency_package_id', $packageId))
+            ->get();
+
+        foreach ($stale as $booking) {
+            $this->release($booking);
+        }
+
+        return $stale->count();
+    }
+
     /**
      * Confirm a booking and seat the traveller on the package's group trip,
      * creating that trip (and its chat) the first time anyone books.
      *
-     * Both the agency confirming by hand and a payment settling arrive here, so
-     * a paid traveller can't end up confirmed but missing from the group chat —
-     * which is exactly what happened while this lived only in the controller.
+     * Reached by a settled payment, after the agency has already approved. The
+     * seating lives here rather than in a controller so a paid traveller can't
+     * end up confirmed but missing from the group chat.
      *
      * Idempotent: confirming twice must not seat anyone twice.
      */

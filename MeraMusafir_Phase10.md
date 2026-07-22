@@ -58,7 +58,11 @@ PaymentController ──► PaymentService ──► GatewayManager ──► Pa
 
 **Commission applies to bookings, not subscriptions.** 5% of an agency booking is the platform's cut of someone else's sale. What an agency pays *us* for its own plan is already entirely ours, so its commission is 0 rather than a meaningless 5% of our own revenue.
 
-**Paying is confirmation.** The seat is sold, so payment marks the booking confirmed and seats the traveller on the departure's group trip. It does *not* wait for the agency to click confirm — money has changed hands.
+**The agency vets before money moves.** A booking goes `pending → approved → confirmed`. The agency approves first; only then can the traveller pay; paying is what confirms the seat and puts them in the group chat.
+
+The ordering matters because of the refund constraint above: JazzCash and EasyPaisa refunds are a manual trip to their merchant portal on a new merchant account. Taking payment up front would make every agency decline a refund somebody processes by hand. Vetting first means **no money is ever held for a booking that gets declined**.
+
+**An approved seat expires.** Approval opens a 48-hour payment window (`BookingService::PAYMENT_WINDOW_HOURS`). Past it the booking is released and its seats go back, so a package can't sell out to people who were approved and never paid. Enforced two ways: lazily wherever bookings are read or paid for, and by `php artisan bookings:expire` for packages nobody happens to be browsing. Schedule that hourly.
 
 **Subscriptions extend, they don't reset.** Renewing early adds the term to whatever is left rather than starting from today, so paying ahead never costs an agency the remainder of the current month.
 
@@ -74,7 +78,7 @@ PaymentController ──► PaymentService ──► GatewayManager ──► Pa
 
 **Refunds stranded seats.** Cancelling a booking through the controller released the package's seats, the trip's headcount and the traveller's place. The refund path set `status = 'cancelled'` directly and did none of it — a refunded package would have sold out at a number nobody could explain. Both paths now go through `BookingService::release()`.
 
-**Paid travellers would have missed the group chat.** Seating a traveller on the departure trip lived inside the agency's `confirmBooking` controller action. Once payment also confirmed bookings, a paid traveller would have been `confirmed` but absent from the trip — the entire point of booking a package. Both paths now go through `BookingService::confirm()`.
+**Paid travellers would have missed the group chat.** Seating a traveller on the departure trip lived inside the agency's `confirmBooking` controller action. Once payment became what confirms a booking, a paid traveller would have been `confirmed` but absent from the trip — the entire point of booking a package. Seating now lives in `BookingService::confirm()`, reached by a settled payment.
 
 Both are the same shape of mistake: lifecycle logic living in a controller that a second caller later needed.
 
@@ -92,6 +96,7 @@ Both are the same shape of mistake: lifecycle logic living in a controller that 
 | `POST` | `/payments/callback/{gateway}` | **public** — the caller is the provider; every driver verifies a signature |
 | `GET` | `/subscriptions/plans` | plans + where this agency stands |
 | `POST` | `/subscriptions` | reserve, pending until paid |
+| `POST` | `/packages/{package}/bookings/{booking}/confirm` | agency approves; opens the payment window |
 | `GET` | `/subscriptions/history` | agency's billing record |
 
 ---
@@ -101,7 +106,9 @@ Both are the same shape of mistake: lifecycle logic living in a controller that 
 - **`/checkout?type=&id=`** — method selection, order summary, and the receipt after settling. Preselects the only method rather than making you tap it. In sandbox it offers an explicit *"Simulate a declined payment"*, because a failure path nobody can trigger is a failure path nobody has tested.
 - **`/transactions`** — history for travellers and agencies, with status colouring and the platform fee broken out on settled bookings.
 - **`/subscription`** — plan comparison, monthly/yearly toggle showing the real saving, current standing, billing history.
-- Booking now goes **straight to checkout** instead of ending on "awaiting agency confirmation" — a held seat isn't a booking until it's paid for.
+- Booking ends on *"Request sent. You'll be able to pay once the agency approves it."* — there's nothing to pay yet.
+- **My Bookings** is where a bill appears: an approved booking shows **Payment due**, a **Pay now** button and the time left, turning red under 12 hours.
+- The agency dashboard says **Approve**, not Confirm, and its notice explains that the traveller then has 48 hours.
 
 ---
 

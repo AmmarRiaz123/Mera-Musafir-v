@@ -312,7 +312,7 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useAgencyStore } from 'src/stores/agencyStore'
 import { useAuthStore } from 'src/stores/authStore'
@@ -320,7 +320,6 @@ import { api } from 'src/boot/axios'
 import ReportDialog from 'src/components/ReportDialog.vue'
 
 const route = useRoute()
-const router = useRouter()
 const $q = useQuasar()
 const store = useAgencyStore()
 const authStore = useAuthStore()
@@ -366,9 +365,12 @@ const submitBooking = async () => {
     })
     myBooking.value = r.data
     showBookDialog.value = false
-    // A held seat isn't a booking until it's paid for, so go straight to
-    // checkout rather than leaving them to find it later.
-    router.push(`/checkout?type=booking&id=${r.data.id}`)
+    // No payment yet — the agency vets first, and you pay once they approve.
+    $q.notify({
+      color: 'positive', icon: 'check',
+      message: "Request sent. You'll be able to pay once the agency approves it.",
+      position: 'top',
+    })
   } catch (err) {
     $q.notify({ color: 'negative', message: err.response?.data?.message || 'Booking failed', icon: 'error' })
   } finally {

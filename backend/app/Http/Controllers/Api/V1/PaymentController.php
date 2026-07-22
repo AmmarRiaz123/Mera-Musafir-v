@@ -75,8 +75,30 @@ class PaymentController extends Controller
             return response()->json(['message' => "That isn't yours to pay for."], 403);
         }
 
-        if ($payable instanceof Booking && $payable->payment_status === 'paid') {
-            return response()->json(['message' => 'This booking is already paid.'], 422);
+        if ($payable instanceof Booking) {
+            if ($payable->payment_status === 'paid') {
+                return response()->json(['message' => 'This booking is already paid.'], 422);
+            }
+
+            // Agencies vet before money moves. Paying a booking they haven't
+            // approved would be taking money for a seat they may refuse.
+            if ($payable->status === 'pending') {
+                return response()->json([
+                    'message' => "The agency hasn't approved this booking yet — you'll be able to pay once they do.",
+                ], 422);
+            }
+
+            if ($payable->status !== 'approved') {
+                return response()->json(['message' => 'This booking can no longer be paid for.'], 422);
+            }
+
+            if ($payable->payment_due_at?->isPast()) {
+                app(\App\Services\BookingService::class)->release($payable);
+
+                return response()->json([
+                    'message' => 'The payment window on this booking has passed. Ask the agency to approve it again.',
+                ], 422);
+            }
         }
 
         $gateway = $validated['gateway'] ?? config('payments.default');

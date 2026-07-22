@@ -15,6 +15,10 @@ class BookingResource extends JsonResource
             'total_amount'    => $this->total_amount,
             'status'          => $this->status,
             'payment_status'  => $this->payment_status,
+            'approved_at'     => $this->approved_at?->toDateTimeString(),
+            'payment_due_at'  => $this->payment_due_at?->toDateTimeString(),
+            // The one thing the UI actually branches on: is there a bill to pay?
+            'awaiting_payment' => $this->status === 'approved' && $this->payment_status === 'unpaid',
             'notes'           => $this->notes,
             'confirmed_at'    => $this->confirmed_at?->toDateTimeString(),
             'cancelled_at'    => $this->cancelled_at?->toDateTimeString(),

@@ -14,6 +14,10 @@ class BookingController extends Controller
     // (and its spawned trip) eager-loaded so trip_id / title are available.
     public function my(Request $request)
     {
+        // Lapsed windows release their seats before anyone reads the list, so
+        // "pay now" never appears on a booking that's already gone.
+        app(\App\Services\BookingService::class)->expireUnpaid();
+
         $bookings = Booking::where('user_id', $request->user()->id)
             ->with(['agencyPackage.trip', 'agencyPackage.destination', 'agencyPackage.agency'])
             ->latest()
