@@ -36,13 +36,13 @@
         </div>
 
         <div v-else class="cx-list">
-          <div v-for="p in people" :key="p.id" class="cx-row">
-            <q-avatar size="42px" class="cx-avatar" @click="goToProfile(p)">
+          <div v-for="p in people" :key="p.id" class="cx-row" @click="goToProfile(p)">
+            <q-avatar size="42px" class="cx-avatar">
               <img v-if="p.avatar" :src="p.avatar" />
               <span v-else>{{ p.name?.[0]?.toUpperCase() }}</span>
             </q-avatar>
 
-            <div class="cx-who" @click="goToProfile(p)">
+            <div class="cx-who">
               <div class="cx-name-line">
                 <span class="cx-name">{{ p.name }}</span>
                 <q-icon v-if="p.is_verified" name="verified" size="14px" color="deep-purple" />
@@ -54,21 +54,15 @@
               </div>
             </div>
 
-            <div class="cx-actions">
-              <!-- Removing a follower only makes sense on your own list -->
-              <q-btn
-                v-if="isSelf && tab !== 'following'"
-                dense flat no-caps size="sm" class="cx-btn"
-                label="Remove"
-                :loading="acting === p.id"
-                @click="confirmRemove(p)"
-              />
-              <q-btn flat round dense size="sm" icon="more_horiz" color="grey-6">
+            <!-- The row is the link, so the menu must not travel with it -->
+            <div class="cx-actions" @click.stop>
+              <q-spinner v-if="acting === p.id" color="primary" size="19px" />
+              <q-btn v-else flat round dense size="sm" icon="more_horiz" color="grey-6">
                 <q-menu auto-close anchor="bottom right" self="top right">
-                  <q-list style="min-width: 172px">
-                    <q-item clickable @click="goToProfile(p)">
-                      <q-item-section avatar><q-icon name="person" size="xs" /></q-item-section>
-                      <q-item-section>View profile</q-item-section>
+                  <q-list style="min-width: 178px">
+                    <q-item v-if="isSelf && tab !== 'following'" clickable @click="confirmRemove(p)">
+                      <q-item-section avatar><q-icon name="group_remove" size="xs" /></q-item-section>
+                      <q-item-section>Remove follower</q-item-section>
                     </q-item>
                     <q-item v-if="isSelf && tab !== 'followers'" clickable @click="unfollow(p)">
                       <q-item-section avatar><q-icon name="person_remove" size="xs" /></q-item-section>
@@ -280,16 +274,16 @@ const confirmBlock = (p) => {
 .cx-list { padding: 6px 0; }
 .cx-row {
   display: flex; align-items: center; gap: 11px;
-  padding: 9px 14px;
+  padding: 9px 14px; cursor: pointer;
   transition: background 0.14s ease;
 }
-.cx-row:hover { background: #fcfafd; }
+.cx-row:hover { background: #f7f3fa; }
 .cx-avatar {
-  flex-shrink: 0; cursor: pointer;
+  flex-shrink: 0;
   background: linear-gradient(135deg, #7b1fa2, #4a148c);
   color: #fff; font-weight: 700; font-size: 15px;
 }
-.cx-who { flex: 1; min-width: 0; cursor: pointer; }
+.cx-who { flex: 1; min-width: 0; }
 .cx-name-line { display: flex; align-items: center; gap: 5px; }
 .cx-name {
   font-size: 13.5px; font-weight: 600; color: #2b1b33;
@@ -305,10 +299,8 @@ const confirmBlock = (p) => {
   font-size: 11.5px; color: #9b8aa5; margin-top: 1px;
 }
 
-.cx-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-.cx-btn {
-  border: 1px solid #ece6f0; border-radius: 999px;
-  color: #6b5a75; font-size: 12px; padding: 2px 12px;
+.cx-actions {
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; min-width: 32px; cursor: default;
 }
-.cx-btn:hover { border-color: #e0b9bd; color: #c62828; }
 </style>

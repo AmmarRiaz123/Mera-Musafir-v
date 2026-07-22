@@ -279,7 +279,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { useSafetyStore } from 'src/stores/safetyStore'
@@ -351,6 +351,14 @@ const isOwnProfile = computed(() => {
 onMounted(async () => {
   await loadProfile()
   if (authStore.isLoggedIn) safetyStore.fetchBlockList()
+})
+
+// /profile and /profile/:id are the same component, so router reuses the
+// instance and onMounted never fires again — the URL would change while the
+// page still showed whoever was there before.
+watch(() => route.params.id, () => {
+  isEditMode.value = false
+  loadProfile()
 })
 
 const loadProfile = async () => {
