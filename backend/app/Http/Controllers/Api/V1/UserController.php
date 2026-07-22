@@ -143,6 +143,11 @@ class UserController extends Controller
             'is_friend'       => ($authUser && !$isSelf) ? $authUser->isFriendsWith($user->id) : false,
             'followers_count' => $user->followers()->count(),
             'following_count' => $user->following()->count(),
+            // Mutuals. Derived from the two directions rather than stored, so it
+            // can't drift out of step with the follow rows it summarises.
+            'friends_count'   => UserFollow::where('following_id', $user->id)
+                ->whereIn('follower_id', UserFollow::where('follower_id', $user->id)->select('following_id'))
+                ->count(),
             // True while the viewer has an unresolved report against this user
             // (so the UI can hide the report button until an admin resolves it).
             'reported_by_me'  => ($authUser && !$isSelf)
@@ -185,6 +190,89 @@ class UserController extends Controller
         return response()->json([
             'message' => 'Profile updated successfully',
             'data'    => new UserResource($user),
+        ]);
+    }
+
+    /**
+     * GET /users/{user}/connections?type=followers|following|friends
+     *
+     * "Friends" isn't a table — it's a mutual follow, so it falls out of
+     * intersecting the two directions rather than needing its own model.
+     * Each row carries the viewer's relationship to that person so the list can
+     * offer the right action without a request per row.
+     */
+    public function connections(Request $request, User $user)
+    {
+        $type = $request->input('type', 'followers');
+
+        if (!in_array($type, ['followers', 'following', 'friends'], true)) {
+            return response()->json(['message' => 'Unknown connection type'], 422);
+        }
+
+        $followerIds  = UserFollow::where('following_id', $user->id)->pluck('follower_id');
+        $followingIds = UserFollow::where('follower_id', $user->id)->pluck('following_id');
+
+        $ids = match ($type) {
+            'followers' => $followerIds,
+            'following' => $followingIds,
+            'friends'   => $followerIds->intersect($followingIds)->values(),
+        };
+
+        $authUser = auth('sanctum')->user();
+
+        // Never list someone you're in a block relationship with, either way.
+        if ($authUser) {
+            $ids = $ids->diff(BlockedUser::relatedIds($authUser->id));
+        }
+
+        if ($ids->isEmpty()) {
+            return response()->json(['data' => []]);
+        }
+
+        $myFollowing = $authUser
+            ? UserFollow::where('follower_id', $authUser->id)->pluck('following_id')->flip()
+            : collect();
+        $myBlocked = $authUser
+            ? BlockedUser::where('blocker_id', $authUser->id)->pluck('blocked_id')->flip()
+            : collect();
+
+        $people = User::whereIn('id', $ids)
+            ->orderByDesc('is_verified')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'data' => $people->map(fn (User $p) => [
+                'id'          => $p->id,
+                'name'        => $p->name,
+                'avatar'      => ImageUrl::resolve($p->avatar),
+                'city'        => $p->city,
+                'is_verified' => (bool) $p->is_verified,
+                'is_agency'   => $p->type === 'agency',
+                'i_follow'    => $myFollowing->has($p->id),
+                'is_blocked'  => $myBlocked->has($p->id),
+            ]),
+        ]);
+    }
+
+    /**
+     * DELETE /users/{user}/follower — drop this person's follow of me.
+     *
+     * Unfollowing is something you do to your own list; this is the other
+     * direction, and there was no way to do it. It doesn't block them: they can
+     * follow again, which is the difference people expect between the two.
+     */
+    public function removeFollower(Request $request, User $user)
+    {
+        $deleted = UserFollow::where('follower_id', $user->id)
+            ->where('following_id', $request->user()->id)
+            ->delete();
+
+        return response()->json([
+            'removed' => (bool) $deleted,
+            'message' => $deleted
+                ? "{$user->name} no longer follows you."
+                : "{$user->name} wasn't following you.",
         ]);
     }
 

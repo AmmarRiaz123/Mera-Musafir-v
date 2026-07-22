@@ -98,6 +98,8 @@ Route::prefix('v1')->group(function () {
 
         // Social graph
         Route::post('/users/{user}/follow', [UserController::class, 'follow']);
+        Route::get('/users/{user}/connections', [UserController::class, 'connections']);
+        Route::delete('/users/{user}/follower', [UserController::class, 'removeFollower']);
 
         // Conversations (DMs)
         Route::get('/conversations',                                                           [ConversationController::class, 'index']);

@@ -1,5 +1,5 @@
 <template>
-  <q-page padding class="flex flex-center bg-grey-2">
+  <q-page padding class="profile-page">
     <!-- Loading State -->
     <div v-if="loading" class="row justify-center q-py-xl">
       <q-spinner-dots color="primary" size="4em" />
@@ -12,20 +12,20 @@
       <q-btn color="primary" label="Go Home" to="/" class="q-mt-md" />
     </div>
 
-    <q-card v-else class="q-pa-md shadow-2" style="width: 100%; max-width: 600px; border-radius: 12px">
+    <q-card v-else flat class="pf-card">
       <!-- VIEW MODE -->
       <div v-if="!isEditMode">
         <!-- Header row with settings/actions -->
-        <q-card-section class="row items-start justify-between q-pb-none">
-          <div class="q-pt-sm">
+        <div class="pf-banner">
+          <div class="pf-banner-tools">
             <!-- Privacy settings link for own profile -->
-            <q-btn v-if="isOwnProfile" flat round icon="settings" color="grey-7" size="sm" to="/privacy">
+            <q-btn v-if="isOwnProfile" flat round icon="settings" color="white" size="sm" to="/privacy">
               <q-tooltip>Privacy Settings</q-tooltip>
             </q-btn>
-          </div>
+
           <!-- Three-dot menu for other profiles -->
-          <div v-if="!isOwnProfile && authStore.isLoggedIn">
-            <q-btn flat round icon="more_vert" color="grey-7">
+          <template v-if="!isOwnProfile && authStore.isLoggedIn">
+            <q-btn flat round icon="more_vert" color="white" size="sm">
               <q-menu anchor="bottom right" self="top right">
                 <q-list style="min-width: 180px">
                   <q-item clickable v-close-popup @click="handleBlock">
@@ -49,28 +49,44 @@
                 </q-list>
               </q-menu>
             </q-btn>
+          </template>
           </div>
-        </q-card-section>
+        </div>
 
-        <q-card-section class="text-center">
-          <q-avatar size="100px" color="grey-4" text-color="grey-8">
+        <q-card-section class="pf-identity text-center">
+          <q-avatar size="104px" class="pf-avatar">
             <img v-if="profileUser.avatar" :src="profileUser.avatar" />
-            <span v-else class="text-h3">{{ profileUser.name.charAt(0).toUpperCase() }}</span>
+            <span v-else>{{ profileUser.name.charAt(0).toUpperCase() }}</span>
           </q-avatar>
-          <div class="row justify-center items-center q-mt-md q-gutter-xs">
-            <div class="text-h5 text-weight-bold">{{ profileUser.name }}</div>
-            <q-icon v-if="profileUser.is_verified" name="verified" color="deep-purple" size="22px">
-              <q-tooltip>Verified User</q-tooltip>
+
+          <div class="pf-name-line">
+            <span class="pf-name">{{ profileUser.name }}</span>
+            <q-icon v-if="profileUser.is_verified" name="verified" color="deep-purple" size="20px">
+              <q-tooltip>Verified traveller</q-tooltip>
             </q-icon>
-            <q-badge v-if="isFriend" color="deep-purple" label="Friends" />
+            <span v-if="isFriend" class="pf-friend-tag">Friends</span>
           </div>
-          <div v-if="profileUser.city" class="text-subtitle1 text-grey-8">
-            <q-icon name="place" /> {{ profileUser.city }}
+
+          <div v-if="profileUser.city" class="pf-city">
+            <q-icon name="place" size="14px" />{{ profileUser.city }}
           </div>
-          <!-- Follower / following counts for other profiles -->
-          <div v-if="!isOwnProfile" class="row justify-center q-gutter-lg q-mt-sm text-caption text-grey-7">
-            <div><span class="text-weight-bold text-dark">{{ followersCount }}</span> followers</div>
-            <div><span class="text-weight-bold text-dark">{{ followingCount }}</span> following</div>
+
+          <!-- The social graph, and the way into it -->
+          <div class="pf-stats">
+            <button type="button" class="pf-stat" @click="openConnections('followers')">
+              <span class="pf-stat-n">{{ followersCount }}</span>
+              <span class="pf-stat-l">{{ followersCount === 1 ? 'Follower' : 'Followers' }}</span>
+            </button>
+            <span class="pf-stat-div" />
+            <button type="button" class="pf-stat" @click="openConnections('following')">
+              <span class="pf-stat-n">{{ followingCount }}</span>
+              <span class="pf-stat-l">Following</span>
+            </button>
+            <span class="pf-stat-div" />
+            <button type="button" class="pf-stat" @click="openConnections('friends')">
+              <span class="pf-stat-n">{{ friendsCount }}</span>
+              <span class="pf-stat-l">{{ friendsCount === 1 ? 'Friend' : 'Friends' }}</span>
+            </button>
           </div>
         </q-card-section>
 
@@ -79,46 +95,43 @@
             "{{ profileUser.bio }}"
           </div>
 
-          <div class="row justify-center q-gutter-sm q-mb-md">
-            <q-badge v-if="profileUser.gender" color="secondary" outline class="q-pa-sm text-subtitle2 capitalize">
-              {{ profileUser.gender }}
-            </q-badge>
-            <q-badge v-if="profileUser.type" color="primary" class="q-pa-sm text-subtitle2 capitalize">
-              {{ profileUser.type }}
-            </q-badge>
+          <div class="pf-chips">
+            <span v-if="profileUser.gender" class="pf-chip capitalize">{{ profileUser.gender }}</span>
+            <span v-if="profileUser.type" class="pf-chip pf-chip--solid capitalize">{{ profileUser.type }}</span>
           </div>
 
-          <div v-if="profileUser.preferences?.travel_style?.length" class="q-mt-md">
-            <div class="text-subtitle2 text-grey-8 q-mb-sm">Travel Style:</div>
-            <div class="row q-gutter-xs">
-              <q-badge
+          <div v-if="profileUser.preferences?.travel_style?.length" class="pf-section">
+            <div class="pf-label">Travel style</div>
+            <div class="pf-chips pf-chips--left">
+              <span
                 v-for="style in profileUser.preferences.travel_style"
                 :key="style"
-                color="primary"
-                class="q-px-sm q-py-xs capitalize"
-              >{{ style }}</q-badge>
+                class="pf-chip pf-chip--solid capitalize"
+              >{{ style }}</span>
             </div>
           </div>
 
-          <div v-if="profileUser.preferences?.regions?.length" class="q-mt-sm">
-            <div class="text-subtitle2 text-grey-8 q-mb-sm">Regions of Interest:</div>
-            <div class="row q-gutter-xs">
-              <q-badge
+          <div v-if="profileUser.preferences?.regions?.length" class="pf-section">
+            <div class="pf-label">Regions of interest</div>
+            <div class="pf-chips pf-chips--left">
+              <span
                 v-for="region in profileUser.preferences.regions"
                 :key="region"
-                color="deep-purple"
-                class="q-px-sm q-py-xs"
-              >{{ region }}</q-badge>
+                class="pf-chip"
+              >{{ region }}</span>
             </div>
           </div>
         </q-card-section>
 
-        <q-card-section class="text-center text-grey-6 text-caption">
-          Member since {{ formatDate(profileUser.created_at) }}
+        <q-card-section class="pf-since">
+          <q-icon name="event" size="13px" />Member since {{ formatDate(profileUser.created_at) }}
         </q-card-section>
 
-        <q-card-actions align="center" v-if="isOwnProfile">
-          <q-btn color="primary" label="Edit Profile" icon="edit" @click="toggleEditMode" />
+        <q-card-actions align="center" v-if="isOwnProfile" class="q-pb-lg">
+          <q-btn
+            unelevated rounded no-caps color="deep-purple"
+            icon="edit" label="Edit profile" @click="toggleEditMode"
+          />
         </q-card-actions>
 
         <!-- Actions for other profiles -->
@@ -140,6 +153,17 @@
           />
         </q-card-actions>
       </div>
+
+      <ConnectionsDialog
+        v-if="profileUser"
+        v-model="connectionsOpen"
+        :user-id="profileUser.id"
+        :user-name="profileUser.name"
+        :is-self="isOwnProfile"
+        :initial-tab="connectionsTab"
+        :known-counts="{ followers: followersCount, following: followingCount, friends: friendsCount }"
+        @changed="refreshCounts"
+      />
 
       <!-- Report dialog -->
       <ReportDialog
@@ -264,6 +288,7 @@ import { useNotificationStore } from 'src/stores/notificationStore'
 import ImageUpload from 'components/ImageUpload.vue'
 import { useQuasar } from 'quasar'
 import ReportDialog from 'src/components/ReportDialog.vue'
+import ConnectionsDialog from 'src/components/ConnectionsDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -279,6 +304,20 @@ const isFollowing = computed(() => socialStore.currentUser?.is_following ?? fals
 const isFriend = computed(() => socialStore.currentUser?.is_friend ?? false)
 const followersCount = computed(() => socialStore.currentUser?.followers_count ?? 0)
 const followingCount = computed(() => socialStore.currentUser?.following_count ?? 0)
+const friendsCount   = computed(() => socialStore.currentUser?.friends_count ?? 0)
+
+const connectionsOpen = ref(false)
+const connectionsTab = ref('followers')
+
+const openConnections = (tab) => {
+  connectionsTab.value = tab
+  connectionsOpen.value = true
+}
+
+// Removing a follower or blocking someone changes the counts behind the card.
+const refreshCounts = () => {
+  if (profileUser.value?.id) socialStore.fetchUser(profileUser.value.id)
+}
 const followLoading = ref(false)
 
 const reportDialog = ref(false)
@@ -320,15 +359,18 @@ const loadProfile = async () => {
   try {
     const requestedId = route.params.id
 
-    if (!requestedId) {
-      // Just load authenticated user
+    // Own profile used to read straight from authStore, which carries no
+    // social-graph counts — so the stats row would sit at zero on your own page.
+    const id = requestedId ?? authStore.user?.id
+
+    if (!id) {
       profileUser.value = authStore.user
       loading.value = false
       return
     }
 
     // Load user by ID through the store so follow state stays in one place
-    profileUser.value = await socialStore.fetchUser(requestedId)
+    profileUser.value = await socialStore.fetchUser(id)
 
   } catch (error) {
     if (error.response?.status === 404) {
@@ -445,7 +487,90 @@ const formatDate = (dateString) => {
 </script>
 
 <style scoped>
-.capitalize {
-  text-transform: capitalize;
+.capitalize { text-transform: capitalize; }
+
+.profile-page {
+  display: flex; justify-content: center; align-items: flex-start;
+  background: #faf8fc;
 }
+
+.pf-card {
+  width: 100%; max-width: 620px;
+  border: 1px solid #ece6f0; border-radius: 18px; overflow: hidden;
+  box-shadow: 0 2px 14px rgba(43, 27, 51, 0.06);
+}
+
+/* A band of colour so the card starts with something other than white space. */
+.pf-banner {
+  height: 96px;
+  background: linear-gradient(120deg, #4a148c, #7b1fa2 55%, #9c4dcc);
+}
+.pf-banner-tools {
+  display: flex; justify-content: flex-end; gap: 4px;
+  padding: 6px 8px; color: #fff;
+}
+.pf-banner-tools :deep(.q-btn) { color: #fff; }
+
+.pf-section { margin-top: 16px; }
+.pf-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #a99bb2; margin-bottom: 7px;
+}
+.pf-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 14px; }
+.pf-chips--left { justify-content: flex-start; margin-top: 0; }
+.pf-chip {
+  padding: 4px 11px; border-radius: 999px;
+  border: 1px solid #e5dced; background: #fff;
+  font-size: 12px; font-weight: 500; color: #6b5a75;
+}
+.pf-chip--solid {
+  background: linear-gradient(135deg, #7b1fa2, #4a148c);
+  border-color: transparent; color: #fff;
+}
+.pf-since {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 11.5px; color: #a99bb2; padding-bottom: 4px;
+}
+
+.pf-identity { padding-top: 0; margin-top: -62px; }
+.pf-avatar {
+  background: linear-gradient(135deg, #7b1fa2, #4a148c);
+  color: #fff; font-size: 40px; font-weight: 700;
+  border: 4px solid #fff; box-shadow: 0 3px 12px rgba(43, 27, 51, 0.18);
+}
+
+.pf-name-line {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin-top: 12px; flex-wrap: wrap;
+}
+.pf-name {
+  font-size: 23px; font-weight: 700; line-height: 1.2;
+  background: linear-gradient(135deg, #4a148c, #7b1fa2);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.pf-friend-tag {
+  padding: 2px 9px; border-radius: 999px;
+  background: #f3ecf7; color: #6a3f86;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+}
+.pf-city {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  margin-top: 4px; font-size: 13px; color: #7a6a82;
+}
+
+.pf-stats {
+  display: flex; align-items: stretch; justify-content: center;
+  margin: 16px auto 0; max-width: 380px;
+  border: 1px solid #ece6f0; border-radius: 14px; background: #fcfafd;
+  overflow: hidden;
+}
+.pf-stat {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 10px 6px; border: 0; background: none; cursor: pointer;
+  transition: background 0.15s ease;
+}
+.pf-stat:hover { background: #f3ecf7; }
+.pf-stat-n { font-size: 17px; font-weight: 700; color: #2b1b33; line-height: 1.1; }
+.pf-stat-l { font-size: 11px; color: #9b8aa5; }
+.pf-stat-div { width: 1px; background: #ece6f0; margin: 8px 0; }
 </style>
