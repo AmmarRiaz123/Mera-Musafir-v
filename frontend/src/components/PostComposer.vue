@@ -165,11 +165,22 @@
         <q-card-section class="q-pt-none">
           <q-input
             v-model="musicQuery" outlined dense rounded clearable
-            placeholder="Search tracks or moods…" debounce="400"
-            @update:model-value="searchMusic"
+            placeholder="Search tracks or artists…" debounce="400"
+            @update:model-value="onMusicSearch"
           >
             <template v-slot:prepend><q-icon name="search" /></template>
           </q-input>
+
+          <div class="mood-rail">
+            <button
+              v-for="m in moodShelves" :key="m.slug"
+              type="button" class="mood-pill"
+              :class="{ 'mood-pill--active': activeMood === m.slug && !musicQuery }"
+              @click="pickMood(m.slug)"
+            >
+              <q-icon :name="MOOD_ICONS[m.slug] || 'music_note'" size="13px" />{{ m.label }}
+            </button>
+          </div>
         </q-card-section>
 
         <q-card-section class="picker-body">
@@ -178,7 +189,10 @@
             <div>{{ musicNotice }}</div>
           </div>
           <div v-else-if="musicLoading" class="picker-loading"><q-spinner-dots color="primary" size="28px" /></div>
-          <div v-else-if="!tracks.length" class="picker-notice"><div>No tracks found.</div></div>
+          <div v-else-if="!tracks.length" class="picker-notice">
+            <q-icon name="graphic_eq" size="26px" />
+            <div>{{ musicQuery ? 'Nothing matched that search.' : 'This shelf is quiet right now — try another mood.' }}</div>
+          </div>
           <q-list v-else separator>
             <q-item v-for="t in tracks" :key="t.id" clickable @click="pickTrack(t)">
               <q-item-section avatar>
@@ -335,16 +349,57 @@ const musicNotice = ref('')
 const previewId = ref(null)
 let previewAudio = null
 
+// The shelves themselves come from the API so there's one definition of them;
+// only the icons live here, since the backend has no business knowing about
+// Material icon names. An unrecognised shelf still renders, with a note.
+const MOOD_ICONS = {
+  popular:   'trending_up',
+  chill:     'bedtime',
+  cinematic: 'movie',
+  roadtrip:  'directions_car',
+  adventure: 'hiking',
+  acoustic:  'piano',
+  desi:      'temple_hindu',
+  calm:      'spa',
+  folk:      'nature_people',
+}
+
+const moods = ref([])
+const activeMood = ref('popular')
+
+// "Popular" isn't a Jamendo tag — it's the unfiltered, popularity-ordered
+// listing, which is what the endpoint returns when no mood is passed.
+const moodShelves = computed(() => [{ slug: 'popular', label: 'Popular' }, ...moods.value])
+
 const openMusic = () => {
   musicDialog.value = true
   if (!tracks.value.length) searchMusic()
+}
+
+// A shelf and a search are alternatives, not filters that stack — picking one
+// clears the other, so what you see always has one obvious cause.
+const pickMood = (slug) => {
+  activeMood.value = slug
+  musicQuery.value = ''
+  searchMusic()
+}
+
+const onMusicSearch = () => {
+  if (musicQuery.value) activeMood.value = 'popular'
+  searchMusic()
 }
 
 const searchMusic = async () => {
   musicLoading.value = true
   musicNotice.value = ''
   try {
-    const { data } = await api.get('/api/v1/media/music', { params: { q: musicQuery.value || '' } })
+    const { data } = await api.get('/api/v1/media/music', {
+      params: {
+        q: musicQuery.value || '',
+        ...(!musicQuery.value && activeMood.value !== 'popular' ? { mood: activeMood.value } : {}),
+      },
+    })
+    if (data.moods) moods.value = data.moods
     if (data.configured === false) {
       musicNotice.value = data.message
       tracks.value = []
@@ -547,6 +602,24 @@ const submit = async () => {
 .picker { width: 560px; max-width: 92vw; border-radius: 14px; }
 .picker-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .picker-sub { font-size: 12px; color: #9b8aa5; margin-top: 2px; }
+.mood-rail {
+  display: flex; gap: 6px; margin-top: 10px;
+  overflow-x: auto; scrollbar-width: none; padding-bottom: 2px;
+}
+.mood-rail::-webkit-scrollbar { display: none; }
+.mood-pill {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  padding: 5px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid #ece6f0; background: #fff;
+  font-size: 12px; color: #6b5a75; white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.mood-pill:hover { border-color: #c9b3d6; background: #fcfafd; }
+.mood-pill--active {
+  background: linear-gradient(135deg, #7b1fa2, #4a148c);
+  border-color: transparent; color: #fff; font-weight: 600;
+}
+
 .picker-body { max-height: 52vh; overflow-y: auto; }
 .picker-loading { display: flex; justify-content: center; padding: 32px 0; }
 .picker-notice {
