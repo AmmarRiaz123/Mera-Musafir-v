@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\V1\PostCommentController;
 use App\Http\Controllers\Api\V1\SafetyController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\UploadController;
+use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\UserController;
 
 // Public routes
@@ -29,6 +31,11 @@ Route::prefix('v1')->group(function () {
     // Destinations (public)
     Route::get('/destinations',          [DestinationController::class, 'index']);
     Route::get('/destinations/{destination}', [DestinationController::class, 'show']);
+
+    // Gateways call this, not users — so it can't sit behind auth. Every driver
+    // verifies a signature before anything is marked paid.
+    Route::post('/payments/callback/{gateway}', [PaymentController::class, 'callback'])
+        ->name('payments.callback');
 
     // User discovery — exact routes MUST be before /users/{user} wildcard
     Route::get('/users',         [UserController::class, 'index']);
@@ -98,6 +105,17 @@ Route::prefix('v1')->group(function () {
 
         // Social graph
         Route::post('/users/{user}/follow', [UserController::class, 'follow']);
+
+        // ── Payments ──────────────────────────────────────────────
+        Route::get('/payments',                  [PaymentController::class, 'index']);
+        Route::get('/payments/methods',          [PaymentController::class, 'methods']);
+        Route::post('/payments/initiate',        [PaymentController::class, 'initiate']);
+        Route::get('/payments/{payment}',        [PaymentController::class, 'show']);
+        Route::post('/payments/{payment}/refund', [PaymentController::class, 'refund']);
+
+        Route::get('/subscriptions/plans',   [SubscriptionController::class, 'plans']);
+        Route::get('/subscriptions/history', [SubscriptionController::class, 'history']);
+        Route::post('/subscriptions',        [SubscriptionController::class, 'store']);
         Route::get('/users/{user}/connections', [UserController::class, 'connections']);
         Route::delete('/users/{user}/follower', [UserController::class, 'removeFollower']);
 

@@ -176,6 +176,14 @@
             <q-item-section>Analytics</q-item-section>
           </q-item>
 
+          <q-item clickable v-ripple to="/subscription">
+            <q-item-section avatar><q-icon name="workspace_premium" /></q-item-section>
+            <q-item-section>Plan &amp; billing</q-item-section>
+            <q-item-section side v-if="myAgency?.tier === 'basic'">
+              <q-badge color="deep-purple" label="Upgrade" rounded />
+            </q-item-section>
+          </q-item>
+
           <q-item clickable v-ripple to="/packages/create">
             <q-item-section avatar><q-icon name="add_box" /></q-item-section>
             <q-item-section>New Package</q-item-section>
@@ -280,6 +288,11 @@
         <q-item v-if="!myAgency" clickable v-ripple to="/my-trips?tab=packages">
           <q-item-section avatar><q-icon name="confirmation_number" /></q-item-section>
           <q-item-section>My Bookings</q-item-section>
+        </q-item>
+
+        <q-item clickable v-ripple to="/transactions">
+          <q-item-section avatar><q-icon name="receipt_long" /></q-item-section>
+          <q-item-section>Transactions</q-item-section>
         </q-item>
 
         <q-item clickable v-ripple @click="handleLogout">
