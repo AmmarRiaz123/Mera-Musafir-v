@@ -1,5 +1,5 @@
 <template>
-  <article ref="root" class="post" :class="{ 'post--agency': post.author.is_agency }">
+  <article ref="root" class="post" :class="{ 'post--agency': post.author.is_agency, 'post--focus': focus }">
     <!-- ── Author ──────────────────────────────────────── -->
     <header class="post-head">
       <q-avatar size="36px" class="post-avatar" @click="goToAuthor">
@@ -24,7 +24,10 @@
             </router-link>
           </template>
           <span class="dot">·</span>
-          <span>{{ timeAgo(post.created_at) }}</span>
+          <span v-if="focus">{{ timeAgo(post.created_at) }}</span>
+          <button v-else type="button" class="time-btn" @click="$emit('open', post)">
+            {{ timeAgo(post.created_at) }}
+          </button>
         </div>
       </div>
 
@@ -93,7 +96,7 @@
       <p class="caption">
         <span class="caption-name" @click="goToAuthor">{{ displayName }}</span>
         <span>{{ displayBody }}</span>
-        <button v-if="isLong && !expanded" type="button" class="more-btn" @click="expanded = true">more</button>
+        <button v-if="isLong" type="button" class="more-btn" @click="$emit('open', post)">more</button>
       </p>
 
       <!-- Music without media gets its own compact player -->
@@ -146,6 +149,15 @@
         <span class="act-label">Send</span>
       </button>
     </div>
+
+    <!-- Only the newest few comments live in the feed; the rest are one click
+         away in the single-post view. -->
+    <button
+      v-if="!focus && post.comments_count > 2"
+      type="button" class="view-all" @click="$emit('open', post)"
+    >
+      View all {{ post.comments_count }} comments
+    </button>
 
     <!-- ── Comments ────────────────────────────────────── -->
     <transition name="slide">
@@ -242,10 +254,13 @@ const props = defineProps({
   comments: { type: Array, default: () => [] },
   showComments: { type: Boolean, default: false },
   loadingComments: { type: Boolean, default: false },
+  // The single-post view. Captions run to 2000 characters, so in the feed they
+  // get clipped — here there's nothing below to protect, so show the lot.
+  focus: { type: Boolean, default: false },
 })
 const emit = defineEmits([
   'like', 'toggle-comments', 'comment', 'delete', 'report',
-  'delete-comment', 'message-author', 'share',
+  'delete-comment', 'message-author', 'share', 'open',
 ])
 
 const router = useRouter()
@@ -294,7 +309,6 @@ const onCommentFile = async (e) => {
 const onGifPicked = (gif) => {
   attachment.value = { url: gif.url, type: 'gif', previewUrl: gif.url }
 }
-const expanded = ref(false)
 const burst = ref(false)
 const root = ref(null)
 
@@ -340,9 +354,9 @@ const displayName = computed(() =>
     : props.post.author.name,
 )
 
-const isLong = computed(() => (props.post.body || '').length > 180)
+const isLong = computed(() => !props.focus && (props.post.body || '').length > 180)
 const displayBody = computed(() =>
-  isLong.value && !expanded.value ? props.post.body.slice(0, 180).trimEnd() + '… ' : props.post.body,
+  isLong.value ? props.post.body.slice(0, 180).trimEnd() + '… ' : props.post.body,
 )
 
 const goToAuthor = () => {
@@ -514,8 +528,22 @@ video.media-el { object-fit: contain; background: #000; }
   white-space: pre-wrap; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+/* Trimming the text isn't enough — the three-line clamp would still hide most
+   of a 2000-character caption in the view whose whole job is showing it. */
+.post--focus .caption { display: block; overflow: visible; }
 .caption-name { font-weight: 600; color: #2b1b33; margin-right: 5px; cursor: pointer; }
 .more-btn { border: 0; background: none; padding: 0; color: #9b8aa5; font: inherit; cursor: pointer; }
+.more-btn:hover { color: var(--q-primary); text-decoration: underline; }
+.time-btn {
+  border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer;
+}
+.time-btn:hover { color: var(--q-primary); text-decoration: underline; }
+.view-all {
+  display: block; width: 100%; text-align: left;
+  border: 0; background: none; cursor: pointer;
+  padding: 2px 14px 8px; font-size: 13px; color: #9b8aa5;
+}
+.view-all:hover { color: var(--q-primary); }
 
 .audio-card {
   display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 10px;

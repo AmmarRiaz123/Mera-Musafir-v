@@ -40,6 +40,7 @@
           :post="focusedPost"
           :comments="store.comments[focusedPost.id] || []"
           :show-comments="true"
+          focus
           :loading-comments="loadingComments === focusedPost.id"
           @like="onLike"
           @toggle-comments="onToggleComments"
@@ -133,6 +134,7 @@
           @delete-comment="onDeleteComment"
           @message-author="onMessageAuthor"
           @share="onShare"
+          @open="openPost"
         />
 
         <div v-if="store.loadingMore" class="row justify-center q-py-md">
@@ -258,6 +260,12 @@ const loadFocused = async (id) => {
   } finally {
     focusLoading.value = false
   }
+}
+
+// Opening a post is a query change, not a route change — the feed stays mounted
+// underneath so going back doesn't refetch it.
+const openPost = (post) => {
+  router.push({ query: { ...route.query, post: post.id } })
 }
 
 const clearFocus = () => {

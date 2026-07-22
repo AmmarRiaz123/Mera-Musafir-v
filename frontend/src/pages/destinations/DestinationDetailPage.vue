@@ -270,6 +270,7 @@
             @toggle-comments="onToggleComments"
             @comment="onComment"
             @share="onSharePost"
+            @open="openPost"
           />
         </div>
       </div>
@@ -316,6 +317,9 @@ const setPostSort = (value) => {
   postSort.value = value
   if (destination.value?.id) loadPosts(destination.value.id)
 }
+
+// This page has no single-post view of its own — the community page owns that.
+const openPost = (post) => router.push({ path: '/community', query: { post: post.id } })
 
 // Traveller-planned trips going to this place. Agency departures are
 // invite-only, so /trips already leaves them out of this list.
