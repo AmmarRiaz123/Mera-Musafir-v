@@ -255,7 +255,10 @@
             :key="member.id"
             class="col-6 col-sm-4 col-md-3"
           >
-            <q-card flat class="member-card" :class="`member-card--${kindOf(member)}`">
+            <q-card
+              flat class="member-card cursor-pointer" :class="`member-card--${kindOf(member)}`"
+              @click="$router.push(`/profile/${member.id}`)"
+            >
               <span class="member-ribbon">{{ kindLabel(member) }}</span>
 
               <div class="row items-center no-wrap">
@@ -290,8 +293,10 @@
                   </div>
                   <div v-else class="text-caption text-grey-5 ellipsis">Travelling solo</div>
                 </div>
-              <!-- Three-dot menu for other members -->
+              <!-- Three-dot menu for other members. The card is a link now, so
+                   the menu has to stop the click travelling up to it. -->
               <q-btn
+                @click.stop
                 v-if="authStore.user && member.id !== authStore.user.id"
                 flat round dense icon="more_vert" size="xs" color="grey-6"
               >

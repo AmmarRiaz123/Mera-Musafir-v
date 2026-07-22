@@ -176,14 +176,14 @@
 
         <template v-else>
           <div v-for="c in comments" :key="c.id" class="comment">
-            <q-avatar size="28px" class="comment-avatar">
+            <q-avatar size="28px" class="comment-avatar comment-avatar--link" @click="goToUser(c.author)">
               <img v-if="c.author.avatar" :src="c.author.avatar" />
               <span v-else>{{ c.author.name?.[0]?.toUpperCase() }}</span>
             </q-avatar>
 
             <div class="bubble">
               <div class="bubble-top">
-                <span class="bubble-name">{{ c.author.name }}</span>
+                <span class="bubble-name bubble-name--link" @click="goToUser(c.author)">{{ c.author.name }}</span>
                 <q-icon v-if="c.author.is_verified" name="verified" size="11px" color="deep-purple" />
                 <span class="bubble-time">{{ timeAgo(c.created_at) }}</span>
               </div>
@@ -366,6 +366,12 @@ const isLong = computed(() => !props.focus && (props.post.body || '').length > 1
 const displayBody = computed(() =>
   isLong.value ? props.post.body.slice(0, 180).trimEnd() + '… ' : props.post.body,
 )
+
+// Comment authors are people too — the post author was clickable and they
+// weren't, which reads as a dead name rather than a deliberate difference.
+const goToUser = (user) => {
+  if (user?.id) router.push(`/profile/${user.id}`)
+}
 
 const goToAuthor = () => {
   if (props.post.author.is_agency && props.post.author.agency_slug) {
@@ -637,6 +643,9 @@ video.media-el { object-fit: contain; background: #000; }
 }
 .bubble-top { display: flex; align-items: center; gap: 5px; }
 .bubble-name { font-size: 12.5px; font-weight: 600; color: #2b1b33; }
+.bubble-name--link { cursor: pointer; }
+.bubble-name--link:hover { color: var(--q-primary); text-decoration: underline; }
+.comment-avatar--link { cursor: pointer; }
 .bubble-time { font-size: 10.5px; color: #b0a3b8; margin-left: auto; }
 .bubble-body { font-size: 13px; line-height: 1.45; color: #3a2d42; margin-top: 2px; overflow-wrap: anywhere; }
 .bubble-media {
