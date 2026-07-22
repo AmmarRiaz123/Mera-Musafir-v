@@ -8,81 +8,31 @@
         </div>
       </header>
 
-      <!-- Composer -->
-      <section v-if="authStore.isLoggedIn" class="composer">
-        <div class="composer-top">
-          <q-avatar size="38px" class="composer-avatar">
-            <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" />
-            <span v-else>{{ authStore.user?.name?.[0]?.toUpperCase() }}</span>
-          </q-avatar>
+      <PostComposer
+        v-if="authStore.isLoggedIn"
+        :destinations="allDestinations"
+        :is-agency="isAgency"
+        @created="onCreated"
+      />
 
-          <q-input
-            v-model="draft.body"
-            class="col"
-            outlined
-            autogrow
-            :rows="expanded ? 3 : 1"
-            maxlength="2000"
-            :placeholder="placeholder"
-            @focus="expanded = true"
-          />
-        </div>
-
-        <transition name="expand">
-          <div v-if="expanded" class="composer-body">
-            <div class="row q-col-gutter-sm q-mt-sm">
-              <div class="col-12 col-sm-6">
-                <q-select
-                  v-model="draft.type"
-                  :options="typeOptions"
-                  option-value="value" option-label="label" emit-value map-options
-                  outlined dense label="Post type"
-                />
-              </div>
-              <div class="col-12 col-sm-6">
-                <q-select
-                  v-model="draft.destination_id"
-                  :options="destinations"
-                  option-value="id" option-label="name" emit-value map-options
-                  outlined dense clearable use-input
-                  label="Tag a destination"
-                  @filter="filterDestinations"
-                >
-                  <template v-slot:prepend><q-icon name="place" size="18px" color="primary" /></template>
-                </q-select>
-              </div>
-            </div>
-
-            <ImageUpload
-              v-model="draft.image"
-              type="destination"
-              label="Add a photo"
-              class="full-width q-mt-sm"
-            />
-
-            <div class="composer-actions">
-              <span class="char-count">{{ draft.body.length }} / 2000</span>
-              <q-btn flat no-caps color="grey-7" label="Cancel" @click="resetDraft" />
-              <q-btn
-                unelevated rounded no-caps color="primary" icon="send" label="Post"
-                :disable="!draft.body.trim()" :loading="posting"
-                @click="submitPost"
-              />
-            </div>
-          </div>
-        </transition>
-      </section>
-
-      <!-- Filters -->
+      <!-- Categories -->
       <nav class="filter-row">
         <button
-          v-for="f in filters"
-          :key="f.value ?? 'all'"
           type="button"
           class="filter-btn"
-          :class="{ 'filter-btn--active': activeType === f.value }"
-          @click="setType(f.value)"
-        >{{ f.label }}</button>
+          :class="{ 'filter-btn--active': activeType === null }"
+          @click="setType(null)"
+        >All</button>
+        <button
+          v-for="t in POST_TYPES"
+          :key="t.value"
+          type="button"
+          class="filter-btn"
+          :class="{ 'filter-btn--active': activeType === t.value }"
+          @click="setType(t.value)"
+        >
+          <q-icon :name="t.icon" size="14px" />{{ t.short }}
+        </button>
       </nav>
 
       <!-- Feed -->
@@ -121,6 +71,7 @@
           @delete="onDelete"
           @report="onReport"
           @delete-comment="onDeleteComment"
+          @message-author="onMessageAuthor"
         />
 
         <div v-if="store.loadingMore" class="row justify-center q-py-md">
@@ -140,22 +91,43 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from 'src/boot/axios'
 import { useAuthStore } from 'src/stores/authStore'
 import { useCommunityStore } from 'src/stores/communityStore'
 import PostCard from 'components/PostCard.vue'
-import ImageUpload from 'components/ImageUpload.vue'
+import PostComposer from 'components/PostComposer.vue'
 import ReportDialog from 'components/ReportDialog.vue'
+import { POST_TYPES } from 'src/utils/postTypes'
+import { useSocialStore } from 'src/stores/socialStore'
+import { useRouter } from 'vue-router'
 
 const $q = useQuasar()
 const authStore = useAuthStore()
 const store = useCommunityStore()
+const socialStore = useSocialStore()
+const router = useRouter()
 
-const expanded = ref(false)
-const posting = ref(false)
-const destinations = ref([])
+const isAgency = computed(() => authStore.user?.type === 'agency')
+
+const onCreated = (post) => store.posts.unshift(post)
+
+// "I'm interested" on a companion post opens a DM with the author.
+const onMessageAuthor = async (post) => {
+  try {
+    const conv = await socialStore.startConversation(post.author.id)
+    router.push(`/messages/${conv.id}`)
+  } catch (err) {
+    const data = err.response?.data
+    $q.notify({
+      type: data?.requested ? 'info' : 'negative',
+      message: data?.message || 'Could not open the conversation',
+      position: 'top',
+    })
+  }
+}
+
 const allDestinations = ref([])
 const activeType = ref(null)
 const openComments = ref(new Set())
@@ -163,54 +135,11 @@ const loadingComments = ref(null)
 const reportDialog = ref(false)
 const reportTarget = ref(null)
 
-const draft = reactive({ body: '', type: 'story', destination_id: null, image: null })
-
-const typeOptions = [
-  { label: 'Story', value: 'story' },
-  { label: 'Travel tip', value: 'tip' },
-  { label: 'Review', value: 'review' },
-  { label: 'Announcement', value: 'announcement' },
-]
-
-const filters = [
-  { label: 'All', value: null },
-  { label: 'Stories', value: 'story' },
-  { label: 'Tips', value: 'tip' },
-  { label: 'Reviews', value: 'review' },
-]
-
-const placeholder = computed(() =>
-  `Share something with the community, ${authStore.user?.name?.split(' ')[0] || 'traveller'}...`,
-)
-
 const feedFilters = computed(() => (activeType.value ? { type: activeType.value } : {}))
 
 const setType = (value) => {
   activeType.value = value
   store.fetchFeed(feedFilters.value)
-}
-
-const resetDraft = () => {
-  Object.assign(draft, { body: '', type: 'story', destination_id: null, image: null })
-  expanded.value = false
-}
-
-const submitPost = async () => {
-  posting.value = true
-  try {
-    await store.createPost({ ...draft, body: draft.body.trim() })
-    resetDraft()
-    $q.notify({ color: 'positive', icon: 'check_circle', message: 'Posted', position: 'top' })
-  } catch (err) {
-    $q.notify({
-      color: 'negative',
-      icon: 'error',
-      position: 'top',
-      message: err.response?.data?.errors?.body?.[0] || err.response?.data?.message || 'Could not post',
-    })
-  } finally {
-    posting.value = false
-  }
 }
 
 const onLike = async (post) => {
@@ -287,15 +216,6 @@ const onReport = (post) => {
   reportDialog.value = true
 }
 
-const filterDestinations = (val, update) => {
-  update(() => {
-    const needle = (val || '').toLowerCase()
-    destinations.value = needle
-      ? allDestinations.value.filter((d) => d.name.toLowerCase().includes(needle))
-      : allDestinations.value
-  })
-}
-
 // Infinite scroll: load the next page as the bottom of the feed approaches.
 const onScroll = () => {
   const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 600
@@ -308,7 +228,6 @@ onMounted(async () => {
   try {
     const r = await api.get('/api/v1/destinations', { params: { per_page: 100 } })
     allDestinations.value = r.data.data || []
-    destinations.value = allDestinations.value
   } catch {
     allDestinations.value = []
   }
@@ -344,10 +263,15 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 .expand-enter-from, .expand-leave-to { opacity: 0; }
 
 /* Filters */
-.filter-row { display: flex; gap: 7px; margin-bottom: 16px; flex-wrap: wrap; }
+.filter-row {
+  display: flex; gap: 7px; margin-bottom: 16px;
+  overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
+}
+.filter-row::-webkit-scrollbar { display: none; }
 .filter-btn {
-  padding: 6px 14px; border: 1px solid #e5dced; border-radius: 999px; background: #fff;
-  font: inherit; font-size: 13px; color: #6b5a75; cursor: pointer; transition: all 0.15s ease;
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  padding: 6px 13px; border: 1px solid #e5dced; border-radius: 999px; background: #fff;
+  font: inherit; font-size: 12.5px; color: #6b5a75; cursor: pointer; transition: all 0.15s ease;
 }
 .filter-btn:hover { border-color: #c9b3d6; }
 .filter-btn--active { background: var(--q-primary); border-color: var(--q-primary); color: #fff; font-weight: 500; }

@@ -28,6 +28,12 @@ class CommunityPostSeeder extends Seeder
         ['story',   'Solo travelled to Gilgit as a woman and felt safe throughout. Plan your transport ahead and keep someone updated.', 'gilgit'],
         ['tip',     'Download offline maps before heading north. Coverage disappears past Chilas and stays gone for a while.', null],
         ['review',  'Shogran was pleasant but Siri Paye is the real reward. Go early, the clouds roll in by midday.', 'shogran'],
+        ['companion', 'Planning Skardu for 5 days mid-September, flying into Islamabad first. Looking for 2-3 people to split transport and rooms. Easy pace, lots of photo stops.', 'skardu'],
+        ['alert',   'Babusar Pass was closed this morning after overnight snow. Check before you commit to that route — the detour via Besham adds most of a day.', 'naran'],
+        ['question','First time driving the KKH in my own car. Is a sedan realistic past Chilas or should I arrange a 4x4?', null],
+        ['gear',    'Three trips in and my packing list has shrunk a lot: down jacket, one fleece, thermals, a 20,000mAh power bank, and a proper headtorch. Everything else I regretted carrying.', null],
+        ['budget',  'Full breakdown of 6 days in Hunza for two people: transport 28k, rooms 24k, food 15k, entries and misc 8k. Total about 75,000 PKR, split.', 'hunza-valley'],
+        ['safety',  'Heads up — someone is running a fake booking page using a real agency name in Gilgit. Verify on the platform before you transfer anything.', 'gilgit'],
     ];
 
     public function run(): void
@@ -55,9 +61,10 @@ class CommunityPostSeeder extends Seeder
                 'type'           => $type,
                 'body'           => $body,
                 // Give roughly half the posts a photo so the feed isn't uniform.
-                'image'          => ($i % 2 === 0 && $images->isNotEmpty())
+                'media_url'      => ($i % 2 === 0 && $images->isNotEmpty())
                     ? $images[$i % $images->count()]
                     : null,
+                'media_type'     => ($i % 2 === 0 && $images->isNotEmpty()) ? 'image' : null,
                 'created_at'     => now()->subHours(($i + 1) * 7),
                 'updated_at'     => now()->subHours(($i + 1) * 7),
             ]);

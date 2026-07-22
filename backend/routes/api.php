@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\CommunityPostController;
 use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\DestinationController;
 use App\Http\Controllers\Api\V1\MatchingController;
+use App\Http\Controllers\Api\V1\MediaSearchController;
 use App\Http\Controllers\Api\V1\MessageRequestController;
 use App\Http\Controllers\Api\V1\PackageController;
 use App\Http\Controllers\Api\V1\PlanningController;
@@ -83,6 +84,10 @@ Route::prefix('v1')->group(function () {
 
         // Profile
         Route::put('/users/{user}',         [UserController::class, 'update']);
+
+        // GIF + music catalogues for the post composer
+        Route::get('/media/gifs',           [MediaSearchController::class, 'gifs']);
+        Route::get('/media/music',          [MediaSearchController::class, 'music']);
 
         // Image uploads (avatars, covers, logos)
         Route::post('/uploads',             [UploadController::class, 'store']);

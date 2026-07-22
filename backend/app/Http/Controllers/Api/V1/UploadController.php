@@ -11,40 +11,76 @@ use Illuminate\Validation\Rule;
 class UploadController extends Controller
 {
     /**
-     * Where each kind of image goes, and the longest edge it's downscaled to.
-     * Everything is re-encoded to JPEG, so a 12MP phone photo can't end up
-     * being served to every visitor.
+     * Where each kind of upload goes, the longest edge it's downscaled to, and
+     * the size ceiling. Images are re-encoded to JPEG so a 12MP phone photo
+     * can't be served to every visitor.
      */
     private const TYPES = [
-        'avatar'         => ['dir' => 'avatars',      'max' => 512],
-        'trip_cover'     => ['dir' => 'trips',        'max' => 1600],
-        'package_cover'  => ['dir' => 'packages',     'max' => 1600],
-        'agency_logo'    => ['dir' => 'agencies',     'max' => 512],
-        'destination'    => ['dir' => 'destinations', 'max' => 1600],
+        'avatar'         => ['dir' => 'avatars',      'max' => 512,  'kb' => 5120],
+        'trip_cover'     => ['dir' => 'trips',        'max' => 1600, 'kb' => 5120],
+        'package_cover'  => ['dir' => 'packages',     'max' => 1600, 'kb' => 5120],
+        'agency_logo'    => ['dir' => 'agencies',     'max' => 512,  'kb' => 5120],
+        'destination'    => ['dir' => 'destinations', 'max' => 1600, 'kb' => 5120],
+        // Community media accepts video and animated GIFs as well as stills.
+        'post_media'     => ['dir' => 'posts',        'max' => 1600, 'kb' => 51200, 'rich' => true],
     ];
+
+    private const VIDEO_MIMES = ['mp4', 'webm', 'mov', 'quicktime'];
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'file' => ['required', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        $type   = $request->input('type');
+        $config = self::TYPES[$type] ?? null;
+
+        if (!$config) {
+            return response()->json([
+                'message' => 'Unknown upload type.',
+                'errors'  => ['type' => ['Unknown upload type.']],
+            ], 422);
+        }
+
+        $rich  = $config['rich'] ?? false;
+        $mimes = $rich ? 'jpg,jpeg,png,webp,gif,mp4,webm,mov' : 'jpg,jpeg,png,webp';
+
+        $request->validate([
+            'file' => ['required', 'file', "mimes:{$mimes}", "max:{$config['kb']}"],
             'type' => ['required', Rule::in(array_keys(self::TYPES))],
         ], [
-            'file.max'    => 'Images must be 5MB or smaller.',
-            'file.mimes'  => 'Use a JPG, PNG or WebP image.',
-            'file.image'  => "That file doesn't look like an image.",
+            'file.max'   => $rich
+                ? 'Videos must be 50MB or smaller.'
+                : 'Images must be 5MB or smaller.',
+            'file.mimes' => $rich
+                ? 'Use a JPG, PNG, WebP, GIF, MP4, WebM or MOV file.'
+                : 'Use a JPG, PNG or WebP image.',
         ]);
 
-        $config = self::TYPES[$validated['type']];
-        $path   = $config['dir'] . '/' . Str::uuid() . '.jpg';
+        $file      = $request->file('file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        $mime      = $file->getMimeType();
 
-        Storage::disk('public')->put(
-            $path,
-            $this->normalise($request->file('file')->getRealPath(), $config['max'])
-        );
+        $isVideo = in_array($extension, self::VIDEO_MIMES, true) || str_starts_with($mime, 'video/');
+        $isGif   = $extension === 'gif' || $mime === 'image/gif';
+
+        // Video and GIF are stored untouched: re-encoding video needs FFmpeg,
+        // and running a GIF through GD would flatten it to a single frame.
+        if ($isVideo || $isGif) {
+            $path = $config['dir'] . '/' . Str::uuid() . '.' . ($isGif ? 'gif' : $extension);
+            Storage::disk('public')->put($path, file_get_contents($file->getRealPath()));
+
+            return response()->json([
+                'path'       => $path,
+                'url'        => Storage::disk('public')->url($path),
+                'media_type' => $isGif ? 'gif' : 'video',
+            ], 201);
+        }
+
+        $path = $config['dir'] . '/' . Str::uuid() . '.jpg';
+        Storage::disk('public')->put($path, $this->normalise($file->getRealPath(), $config['max']));
 
         return response()->json([
-            'path' => $path,
-            'url'  => Storage::disk('public')->url($path),
+            'path'       => $path,
+            'url'        => Storage::disk('public')->url($path),
+            'media_type' => 'image',
         ], 201);
     }
 

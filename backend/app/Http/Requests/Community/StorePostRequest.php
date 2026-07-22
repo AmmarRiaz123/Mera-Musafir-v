@@ -15,9 +15,17 @@ class StorePostRequest extends FormRequest
     {
         return [
             'body'           => ['required', 'string', 'max:2000'],
-            'type'           => ['nullable', 'in:story,tip,review,announcement'],
+            'type'           => ['nullable', 'in:story,tip,review,announcement,companion,question,alert,gear,budget,safety'],
             'destination_id' => ['nullable', 'exists:destinations,id'],
-            'image'          => ['nullable', 'string', 'max:2048'],
+            'media_url'      => ['nullable', 'string', 'max:2048'],
+            'media_type'     => ['nullable', 'in:image,video,gif'],
+            'audio'          => ['nullable', 'array'],
+            'audio.provider' => ['nullable', 'string', 'max:40'],
+            'audio.id'       => ['nullable', 'string', 'max:80'],
+            'audio.title'    => ['nullable', 'string', 'max:200'],
+            'audio.artist'   => ['nullable', 'string', 'max:200'],
+            'audio.audio_url'=> ['nullable', 'url', 'max:2048'],
+            'audio.cover'    => ['nullable', 'url', 'max:2048'],
         ];
     }
 

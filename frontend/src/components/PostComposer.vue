@@ -1,0 +1,493 @@
+<template>
+  <section class="composer">
+    <!-- Collapsed prompt -->
+    <div v-if="!expanded" class="prompt" @click="expanded = true">
+      <q-avatar size="34px" class="prompt-avatar">
+        <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" />
+        <span v-else>{{ authStore.user?.name?.[0]?.toUpperCase() }}</span>
+      </q-avatar>
+      <span class="prompt-text">Share something with the community…</span>
+      <q-icon name="add_photo_alternate" size="20px" color="primary" />
+    </div>
+
+    <!-- Expanded -->
+    <div v-else class="editor">
+      <header class="editor-head">
+        <q-avatar size="34px" class="prompt-avatar">
+          <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" />
+          <span v-else>{{ authStore.user?.name?.[0]?.toUpperCase() }}</span>
+        </q-avatar>
+        <span class="editor-name">{{ authStore.user?.name }}</span>
+        <q-space />
+        <q-btn flat round dense size="sm" icon="close" color="grey-7" @click="reset" />
+      </header>
+
+      <!-- Category -->
+      <div class="type-scroll">
+        <button
+          v-for="t in availableTypes"
+          :key="t.value"
+          type="button"
+          class="type-pill"
+          :class="{ 'type-pill--active': form.type === t.value }"
+          @click="form.type = t.value"
+        >
+          <q-icon :name="t.icon" size="14px" />{{ t.label }}
+        </button>
+      </div>
+
+      <q-input
+        v-model="form.body"
+        class="body-input"
+        borderless
+        autogrow
+        :rows="3"
+        maxlength="2000"
+        :placeholder="bodyPlaceholder"
+      />
+
+      <!-- Selected media preview -->
+      <div v-if="form.media_url" class="preview">
+        <video v-if="form.media_type === 'video'" :src="previewUrl" class="preview-el" controls preload="metadata" />
+        <img v-else :src="previewUrl" class="preview-el" alt="" />
+        <q-btn round dense unelevated class="preview-remove" icon="close" size="sm" @click="clearMedia" />
+      </div>
+
+      <!-- Selected track -->
+      <div v-if="form.audio" class="track-chip">
+        <q-icon name="music_note" size="15px" />
+        <span class="track-text">{{ form.audio.title }} · {{ form.audio.artist }}</span>
+        <q-btn flat round dense size="xs" icon="close" @click="form.audio = null" />
+      </div>
+
+      <!-- Destination -->
+      <q-select
+        v-model="form.destination_id"
+        :options="destinationOptions"
+        option-value="id" option-label="name" emit-value map-options
+        outlined dense clearable use-input hide-selected fill-input
+        input-debounce="200"
+        label="Tag a destination"
+        class="q-mt-sm"
+        @filter="filterDestinations"
+      >
+        <template v-slot:prepend><q-icon name="place" size="18px" color="primary" /></template>
+      </q-select>
+
+      <!-- Attach bar -->
+      <div class="attach-bar">
+        <button type="button" class="attach" :disabled="uploading" @click="pickFile">
+          <q-icon name="image" size="20px" /><span>Photo / Video</span>
+        </button>
+        <button type="button" class="attach" @click="openGifs">
+          <q-icon name="gif_box" size="20px" /><span>GIF</span>
+        </button>
+        <button type="button" class="attach" @click="openMusic">
+          <q-icon name="library_music" size="20px" /><span>Music</span>
+        </button>
+        <q-space />
+        <span class="counter">{{ form.body.length }}/2000</span>
+      </div>
+
+      <div v-if="uploading" class="uploading">
+        <q-linear-progress indeterminate color="primary" rounded size="3px" />
+        <span>Uploading…</span>
+      </div>
+
+      <div class="editor-actions">
+        <q-btn flat no-caps color="grey-7" label="Cancel" @click="reset" />
+        <q-btn
+          unelevated rounded no-caps color="primary" label="Share"
+          :disable="!canPost" :loading="posting" @click="submit"
+        />
+      </div>
+
+      <input ref="fileInput" type="file" class="hidden" accept="image/*,video/mp4,video/webm,video/quicktime" @change="onFile" />
+    </div>
+
+    <!-- ── GIF picker ─────────────────────────────────── -->
+    <q-dialog v-model="gifDialog">
+      <q-card class="picker">
+        <q-card-section class="picker-head">
+          <div class="text-h6">Choose a GIF</div>
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="q-pt-none">
+          <q-input
+            v-model="gifQuery" outlined dense rounded clearable
+            placeholder="Search GIFs…" debounce="400"
+            @update:model-value="searchGifs"
+          >
+            <template v-slot:prepend><q-icon name="search" /></template>
+          </q-input>
+        </q-card-section>
+
+        <q-card-section class="picker-body">
+          <div v-if="gifNotice" class="picker-notice">
+            <q-icon name="info" size="26px" />
+            <div>{{ gifNotice }}</div>
+          </div>
+          <div v-else-if="gifLoading" class="picker-loading"><q-spinner-dots color="primary" size="28px" /></div>
+          <div v-else-if="!gifs.length" class="picker-notice"><div>No GIFs found.</div></div>
+          <div v-else class="gif-grid">
+            <button v-for="g in gifs" :key="g.id" type="button" class="gif-cell" @click="pickGif(g)">
+              <img :src="g.preview" :alt="g.title" loading="lazy" />
+            </button>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
+    <!-- ── Music picker ───────────────────────────────── -->
+    <q-dialog v-model="musicDialog">
+      <q-card class="picker">
+        <q-card-section class="picker-head">
+          <div>
+            <div class="text-h6">Add music</div>
+            <div class="picker-sub">Royalty-free tracks, free to use with credit</div>
+          </div>
+          <q-btn flat round dense icon="close" v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="q-pt-none">
+          <q-input
+            v-model="musicQuery" outlined dense rounded clearable
+            placeholder="Search tracks or moods…" debounce="400"
+            @update:model-value="searchMusic"
+          >
+            <template v-slot:prepend><q-icon name="search" /></template>
+          </q-input>
+        </q-card-section>
+
+        <q-card-section class="picker-body">
+          <div v-if="musicNotice" class="picker-notice">
+            <q-icon name="info" size="26px" />
+            <div>{{ musicNotice }}</div>
+          </div>
+          <div v-else-if="musicLoading" class="picker-loading"><q-spinner-dots color="primary" size="28px" /></div>
+          <div v-else-if="!tracks.length" class="picker-notice"><div>No tracks found.</div></div>
+          <q-list v-else separator>
+            <q-item v-for="t in tracks" :key="t.id" clickable @click="pickTrack(t)">
+              <q-item-section avatar>
+                <q-avatar rounded size="42px" class="audio-cover">
+                  <img v-if="t.cover" :src="t.cover" />
+                  <q-icon v-else name="music_note" />
+                </q-avatar>
+              </q-item-section>
+              <q-item-section>
+                <q-item-label class="text-weight-medium">{{ t.title }}</q-item-label>
+                <q-item-label caption>{{ t.artist }}</q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-btn
+                  round flat dense color="primary"
+                  :icon="previewId === t.id ? 'pause' : 'play_arrow'"
+                  @click.stop="previewTrack(t)"
+                />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+  </section>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onUnmounted } from 'vue'
+import { useQuasar } from 'quasar'
+import { api } from 'src/boot/axios'
+import { useAuthStore } from 'src/stores/authStore'
+import { POST_TYPES, travellerTypes } from 'src/utils/postTypes'
+
+const props = defineProps({
+  destinations: { type: Array, default: () => [] },
+  isAgency: { type: Boolean, default: false },
+})
+const emit = defineEmits(['created'])
+
+const $q = useQuasar()
+const authStore = useAuthStore()
+
+const expanded = ref(false)
+const posting = ref(false)
+const uploading = ref(false)
+const fileInput = ref(null)
+
+const form = reactive({
+  body: '', type: 'story', destination_id: null,
+  media_url: null, media_type: null, audio: null,
+})
+
+// Agencies get the announcement category; travellers don't.
+const availableTypes = computed(() => (props.isAgency ? POST_TYPES : travellerTypes))
+
+const bodyPlaceholder = computed(() => ({
+  companion: 'Where are you going, when, and who are you looking for?',
+  question:  'What do you want to ask the community?',
+  alert:     'What should other travellers know right now?',
+  gear:      'What worked, what did you regret packing?',
+  budget:    'Break down what the trip actually cost.',
+  safety:    'What happened, and where?',
+}[form.type] ?? 'Share something with the community…'))
+
+const canPost = computed(() => form.body.trim().length > 0 && !uploading.value)
+
+const previewUrl = computed(() => {
+  if (!form.media_url) return null
+  return /^(https?:|data:)/.test(form.media_url)
+    ? form.media_url
+    : `http://localhost:8000/storage/${form.media_url}`
+})
+
+// ── Destinations ────────────────────────────────────
+const destinationOptions = ref([])
+const filterDestinations = (val, update) => {
+  update(() => {
+    const needle = (val || '').toLowerCase()
+    destinationOptions.value = needle
+      ? props.destinations.filter((d) => d.name.toLowerCase().includes(needle))
+      : props.destinations
+  })
+}
+
+// ── File upload ─────────────────────────────────────
+const pickFile = () => fileInput.value?.click()
+
+const onFile = async (e) => {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+
+  uploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('type', 'post_media')
+    // Clearing Content-Type lets the browser set the multipart boundary.
+    const { data } = await api.post('/api/v1/uploads', fd, { headers: { 'Content-Type': undefined } })
+    form.media_url = data.path
+    form.media_type = data.media_type
+  } catch (err) {
+    $q.notify({
+      color: 'negative', position: 'top',
+      message: err.response?.data?.errors?.file?.[0] || 'Upload failed',
+    })
+  } finally {
+    uploading.value = false
+  }
+}
+
+const clearMedia = () => {
+  form.media_url = null
+  form.media_type = null
+}
+
+// ── GIF picker ──────────────────────────────────────
+const gifDialog = ref(false)
+const gifQuery = ref('')
+const gifs = ref([])
+const gifLoading = ref(false)
+const gifNotice = ref('')
+
+const openGifs = () => {
+  gifDialog.value = true
+  if (!gifs.value.length) searchGifs()
+}
+
+const searchGifs = async () => {
+  gifLoading.value = true
+  gifNotice.value = ''
+  try {
+    const { data } = await api.get('/api/v1/media/gifs', { params: { q: gifQuery.value || '' } })
+    if (data.configured === false) {
+      gifNotice.value = data.message
+      gifs.value = []
+    } else {
+      gifs.value = data.data || []
+    }
+  } catch (err) {
+    gifNotice.value = err.response?.data?.message || 'GIF search is unavailable right now.'
+    gifs.value = []
+  } finally {
+    gifLoading.value = false
+  }
+}
+
+const pickGif = (gif) => {
+  // Giphy GIFs are hotlinked, not copied to our storage.
+  form.media_url = gif.url
+  form.media_type = 'gif'
+  gifDialog.value = false
+}
+
+// ── Music picker ────────────────────────────────────
+const musicDialog = ref(false)
+const musicQuery = ref('')
+const tracks = ref([])
+const musicLoading = ref(false)
+const musicNotice = ref('')
+const previewId = ref(null)
+let previewAudio = null
+
+const openMusic = () => {
+  musicDialog.value = true
+  if (!tracks.value.length) searchMusic()
+}
+
+const searchMusic = async () => {
+  musicLoading.value = true
+  musicNotice.value = ''
+  try {
+    const { data } = await api.get('/api/v1/media/music', { params: { q: musicQuery.value || '' } })
+    if (data.configured === false) {
+      musicNotice.value = data.message
+      tracks.value = []
+    } else {
+      tracks.value = data.data || []
+    }
+  } catch (err) {
+    musicNotice.value = err.response?.data?.message || 'Music search is unavailable right now.'
+    tracks.value = []
+  } finally {
+    musicLoading.value = false
+  }
+}
+
+const stopPreview = () => {
+  if (previewAudio) {
+    previewAudio.pause()
+    previewAudio = null
+  }
+  previewId.value = null
+}
+
+const previewTrack = (track) => {
+  if (previewId.value === track.id) return stopPreview()
+  stopPreview()
+  previewAudio = new Audio(track.audio_url)
+  previewAudio.addEventListener('ended', stopPreview)
+  previewAudio.play().then(() => (previewId.value = track.id)).catch(stopPreview)
+}
+
+const pickTrack = (track) => {
+  form.audio = {
+    provider: track.provider,
+    id: track.id,
+    title: track.title,
+    artist: track.artist,
+    audio_url: track.audio_url,
+    cover: track.cover,
+  }
+  stopPreview()
+  musicDialog.value = false
+}
+
+onUnmounted(stopPreview)
+
+// ── Submit ──────────────────────────────────────────
+const reset = () => {
+  Object.assign(form, {
+    body: '', type: 'story', destination_id: null,
+    media_url: null, media_type: null, audio: null,
+  })
+  expanded.value = false
+}
+
+const submit = async () => {
+  posting.value = true
+  try {
+    const { data } = await api.post('/api/v1/community/posts', { ...form, body: form.body.trim() })
+    emit('created', data.data)
+    reset()
+    $q.notify({ color: 'positive', icon: 'check_circle', message: 'Shared', position: 'top' })
+  } catch (err) {
+    $q.notify({
+      color: 'negative', position: 'top',
+      message: err.response?.data?.errors?.body?.[0] || err.response?.data?.message || 'Could not post',
+    })
+  } finally {
+    posting.value = false
+  }
+}
+</script>
+
+<style scoped>
+.composer { background: #fff; border: 1px solid #ece6f0; border-radius: 12px; margin-bottom: 14px; }
+
+.prompt { display: flex; align-items: center; gap: 11px; padding: 12px 14px; cursor: pointer; }
+.prompt-avatar {
+  background: linear-gradient(135deg, #7b1fa2, #4a148c);
+  color: #fff; font-weight: 700; font-size: 13px; flex-shrink: 0;
+}
+.prompt-text { flex: 1; font-size: 13.5px; color: #9b8aa5; }
+
+.editor { padding: 12px 14px 10px; }
+.editor-head { display: flex; align-items: center; gap: 10px; }
+.editor-name { font-size: 13.5px; font-weight: 600; color: #2b1b33; }
+
+.type-scroll {
+  display: flex; gap: 6px; margin: 12px 0 4px;
+  overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
+}
+.type-scroll::-webkit-scrollbar { display: none; }
+.type-pill {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  padding: 5px 11px; border: 1px solid #e5dced; border-radius: 999px; background: #fff;
+  font: inherit; font-size: 12px; color: #6b5a75; cursor: pointer; transition: all 0.15s ease;
+}
+.type-pill:hover { border-color: #c9b3d6; }
+.type-pill--active { background: var(--q-primary); border-color: var(--q-primary); color: #fff; font-weight: 500; }
+
+.body-input { font-size: 14px; }
+
+.preview { position: relative; margin-top: 8px; border-radius: 11px; overflow: hidden; background: #f2eef5; }
+.preview-el { width: 100%; max-height: 340px; object-fit: cover; display: block; }
+.preview-remove { position: absolute; top: 8px; right: 8px; background: rgba(20, 10, 26, 0.6); color: #fff; }
+
+.track-chip {
+  display: flex; align-items: center; gap: 7px; margin-top: 8px;
+  padding: 6px 8px 6px 11px; border-radius: 999px;
+  background: linear-gradient(120deg, #f5eef8, #ede7f6); color: #4a148c; font-size: 12.5px;
+}
+.track-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.attach-bar { display: flex; align-items: center; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+.attach {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 10px; border: 0; border-radius: 9px; background: transparent;
+  font: inherit; font-size: 12.5px; color: #6b5a75; cursor: pointer; transition: background 0.15s ease;
+}
+.attach:hover:not(:disabled) { background: #f5eef8; color: #2b1b33; }
+.attach:disabled { opacity: 0.5; cursor: not-allowed; }
+.attach .q-icon { color: var(--q-primary); }
+.counter { font-size: 11.5px; color: #b0a3b8; }
+
+.uploading { display: flex; align-items: center; gap: 9px; margin-top: 8px; font-size: 12px; color: #7a6a82; }
+.uploading .q-linear-progress { flex: 1; }
+
+.editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.hidden { display: none; }
+
+/* ── Pickers ────────────────────────────────────────── */
+.picker { width: 560px; max-width: 92vw; border-radius: 14px; }
+.picker-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.picker-sub { font-size: 12px; color: #9b8aa5; margin-top: 2px; }
+.picker-body { max-height: 52vh; overflow-y: auto; }
+.picker-loading { display: flex; justify-content: center; padding: 32px 0; }
+.picker-notice {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 34px 16px; text-align: center; color: #9b8aa5; font-size: 13px;
+}
+
+.gif-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.gif-cell {
+  border: 0; padding: 0; border-radius: 8px; overflow: hidden; cursor: pointer;
+  background: #f2eef5; aspect-ratio: 1; transition: transform 0.12s ease;
+}
+.gif-cell:hover { transform: scale(0.97); }
+.gif-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.audio-cover { background: #4a148c; color: #fff; }
+</style>

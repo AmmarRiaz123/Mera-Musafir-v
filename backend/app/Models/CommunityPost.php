@@ -12,7 +12,8 @@ class CommunityPost extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'user_id', 'destination_id', 'type', 'body', 'image',
+        'user_id', 'destination_id', 'type', 'body',
+        'media_url', 'media_type', 'audio',
         'is_flagged', 'is_hidden',
     ];
 
@@ -21,6 +22,7 @@ class CommunityPost extends Model
         return [
             'is_flagged' => 'boolean',
             'is_hidden'  => 'boolean',
+            'audio'      => 'array',
         ];
     }
 
@@ -57,9 +59,10 @@ class CommunityPost extends Model
             : false;
     }
 
-    // Images are stored as relative paths (see ImageUrl::toPath).
-    public function setImageAttribute($value): void
+    // Uploaded media is stored as a relative path; an external GIF URL is kept
+    // as-is (see ImageUrl::toPath).
+    public function setMediaUrlAttribute($value): void
     {
-        $this->attributes['image'] = ImageUrl::toPath($value);
+        $this->attributes['media_url'] = ImageUrl::toPath($value);
     }
 }

@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+
+    // Community media catalogues. Both are optional — the pickers degrade to a
+    // "not set up yet" state when these are absent.
+    'giphy' => [
+        'key' => env('GIPHY_KEY'),
+    ],
+
+    'jamendo' => [
+        'client_id' => env('JAMENDO_CLIENT_ID'),
+    ],
+
 ];

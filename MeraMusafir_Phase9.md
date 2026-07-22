@@ -1,6 +1,6 @@
 # Phase 9 — Community Feed
 
-**Status:** Complete and verified end to end
+**Status:** Complete and verified end to end (includes the Phase 9.5 rich-media pass)
 **Goal (from master plan):** *"Living community that keeps users engaged between trips"*
 
 ---
@@ -19,7 +19,18 @@
 | Create post (text + image upload) | Inline composer using the Phase 8.5 `ImageUpload` pipeline |
 | Post card (image, text, destination tag, like + comment counts) | `PostCard.vue` |
 | Destination-specific feed | "From the community" section on the destination detail page |
-| Agency post type (styled differently) | Agency posts get a gradient background, an **AGENCY** badge and link to the storefront |
+| Agency post type (styled differently) | Agency posts carry an **AGENCY** badge and link to the storefront |
+
+### Phase 9.5 — rich media & categories (follow-up pass)
+
+| Added | Notes |
+|---|---|
+| 6 new categories | **Find companions**, Question, Road/weather alert, Gear & packing, Budget, Safety — on top of Story, Tip, Review, Announcement |
+| Companion call-to-action | Companion posts show **"I'm interested"**, which opens a DM with the author (respects DM privacy — falls back to a message request) |
+| Video posts | Upload + inline playback, `media_type = video` |
+| GIF support | Giphy picker (hotlinked, not copied to disk); uploaded `.gif` files pass through **unflattened** so animation survives |
+| Music on posts | Royalty-free catalogue (Jamendo) with search + preview; track shown as a tappable pill over the media, like a reel's audio credit |
+| Instagram-style UI | Full-bleed media, actions under the media, double-tap-to-like with heart burst, `N likes`, inline `name + caption`, "View all N comments", relative timestamps |
 
 ---
 
@@ -59,19 +70,25 @@ app/Http/Requests/Community/StorePostRequest.php, UpdatePostRequest.php, StoreCo
 app/Http/Resources/PostResource.php, CommentResource.php
 app/Http/Controllers/Api/V1/CommunityPostController.php, PostCommentController.php
 database/seeders/CommunityPostSeeder.php
+database/migrations/2026_07_22_000200_extend_community_posts_media.php
+app/Http/Controllers/Api/V1/MediaSearchController.php
 ```
 
 **Backend — changed**
 ```
 app/Http/Controllers/Controller.php   → added AuthorizesRequests
 app/Http/Controllers/Api/V1/SafetyController.php → reports now accept type "post"
+app/Http/Controllers/Api/V1/UploadController.php  → post_media: video + GIF passthrough
+config/services.php                               → giphy + jamendo keys
 routes/api.php, database/seeders/DatabaseSeeder.php
 ```
 
 **Frontend — new**
 ```
 src/stores/communityStore.js
-src/components/PostCard.vue
+src/components/PostCard.vue        → Instagram-style card
+src/components/PostComposer.vue    → composer with GIF + music pickers
+src/utils/postTypes.js             → single source of truth for categories
 src/pages/community/CommunityPage.vue
 ```
 
@@ -91,7 +108,7 @@ src/pages/destinations/DestinationDetailPage.vue → destination feed + removed 
 |---|---|---|---|
 | GET | `/api/v1/community/posts` | optional | Ranked feed. `?destination_id=`, `?type=`, `?user_id=`, `?page=`, `?per_page=` |
 | GET | `/api/v1/community/posts/{post}` | optional | 404 if hidden |
-| POST | `/api/v1/community/posts` | required | `body` (≤2000), `type`, `destination_id`, `image` |
+| POST | `/api/v1/community/posts` | required | `body` (≤2000), `type`, `destination_id`, `media_url`, `media_type`, `audio{}` |
 | PUT | `/api/v1/community/posts/{post}` | author | |
 | DELETE | `/api/v1/community/posts/{post}` | author | Soft delete |
 | POST | `/api/v1/community/posts/{post}/like` | required | Toggles; returns `is_liked` + `likes_count` |
@@ -99,7 +116,11 @@ src/pages/destinations/DestinationDetailPage.vue → destination feed + removed 
 | POST | `/api/v1/community/posts/{post}/comments` | required | `body` (≤1000) |
 | DELETE | `/api/v1/community/posts/{post}/comments/{comment}` | comment or post author | |
 
-Post types: `story` · `tip` · `review` · `announcement`.
+| GET | `/api/v1/media/gifs?q=` | required | Giphy proxy. `{configured:false}` when no key |
+| GET | `/api/v1/media/music?q=` | required | Jamendo proxy. `{configured:false}` when no key |
+| POST | `/api/v1/uploads` (`type=post_media`) | required | Images, GIFs and video up to 50MB |
+
+Post types: `companion` · `story` · `tip` · `question` · `review` · `alert` · `gear` · `budget` · `safety` · `announcement` (agency only).
 
 ---
 
@@ -122,6 +143,20 @@ Backend (curl) and UI (headless Chromium), all passing with zero console errors:
 
 ---
 
+## 5b. Rich media — how it works
+
+**Media column.** `image` was replaced by `media_url` + `media_type` (`image|video|gif`). The migration copies existing images across and is fully reversible. `media_url` holds either a stored path **or** an external URL — a Giphy GIF is hotlinked rather than copied onto our disk, which is how Giphy is meant to be used and keeps storage small.
+
+**Keys stay server-side.** `/media/gifs` and `/media/music` proxy Giphy and Jamendo from Laravel, so the API keys never reach the browser, and there's one place to cache (10 min), normalise and rate-limit. Both endpoints return `{ configured: false, message }` when a key is absent, and the pickers show that message instead of breaking.
+
+**Why Jamendo and not Spotify/Apple.** Instagram can put commercial music on your reel because Meta licenses it from the labels. Spotify and Apple preview APIs explicitly forbid using clips as background audio for user content. Jamendo is Creative Commons licensed, so the artist and licence come back with each track and the UI credits them.
+
+**Video has no transcoding.** There is no FFmpeg in this environment, so uploads are stored as-is: a 4K phone clip stays 4K and every viewer downloads all of it. Capped at 50MB. Production needs a transcoding pipeline and a CDN.
+
+**PHP limits had to be raised.** `upload_max_filesize` defaulted to **2M**, so PHP rejected videos before Laravel ever saw the request. Added `/usr/local/etc/php/8.3/conf.d/zz-meramusafir.ini` (64M upload / 72M post / 256M memory). **Any new machine or server needs the same change** or video uploads fail with a confusing "The file failed to upload."
+
+---
+
 ## 6. Known limitations / deliberate scope cuts
 
 1. **No realtime.** New posts appear on refresh or navigation, not pushed over Reverb. Trip chat is realtime; the feed is not. Worth adding if engagement justifies it.
@@ -130,6 +165,9 @@ Backend (curl) and UI (headless Chromium), all passing with zero console errors:
 4. **Feed isn't cached.** Deliberate — the Phase 8.5 matching cache served stale results for an hour after a trip changed. Ranking is cheap here; caching can come with proper invalidation later.
 5. **`per_page` is unbounded**, so a client could request a huge page. Fine for now; worth clamping before public launch.
 6. Seeded post text is illustrative demo copy, not real user content.
+7. **The GIF and music pickers are untested against live APIs** — no keys were available. The request-building, caching, normalisation and the "not configured" path are all verified; the live responses are not. Add the keys below and re-check.
+8. No video transcoding or poster-frame generation (see 5b).
+9. Music plays through a plain `<audio>` element — it doesn't mix into a video's own soundtrack the way Instagram does.
 
 ---
 
@@ -177,13 +215,40 @@ Log in as **test6@test.com** (or any `test1–test6`, password `password`). Agen
 27. Like and comment from the destination page → both work inline.
 28. Open a destination with no posts → friendly empty state with a link to Community.
 
+### Rich media & categories
+31. Open the composer → the category strip scrolls horizontally with 9 options (agencies also see **Announcement**).
+32. Pick **Find companions** → the placeholder changes to *"Where are you going, when, and who are you looking for?"*.
+33. Post a companion listing → on someone else's account it shows a teal **"I'm interested"** button.
+34. Click **I'm interested** → opens a DM with the author. If they restrict DMs, you get the message-request flow instead.
+35. Filter by **Companions** → only companion posts remain.
+36. Attach a **photo** → preview appears, then renders full-bleed in the feed.
+37. Attach a **video** (mp4 under 50MB) → preview has controls, and it plays inline in the feed.
+38. **Double-tap** any post's media → a large heart bursts and the post is liked (double-tapping again never *un*likes).
+39. Long post → caption truncates with a **more** link.
+40. Check `N likes`, `View all N comments` and the uppercase relative timestamp all read correctly.
+41. Click **GIF** → without a key you get *"GIF search is not set up yet…"*. With a key, search and pick one; it renders in the feed.
+42. Click **Music** → same. With a key, search, press ▶ to preview, pick a track → it appears as a pill over the media; tap the pill to play.
+
 ### Ranking (optional, the interesting one)
 29. As **test4**, note where the agency's post sits in the feed.
 30. Follow **Hunza Explorers** (Agencies → Follow), reload Community → its post ranks noticeably higher.
 
 ---
 
-## 8. Reproducing the data
+## 8. Enabling GIFs and music
+
+Both are optional; the app runs fine without them. To turn them on, add free keys to `backend/.env`:
+
+```
+GIPHY_KEY=            # https://developers.giphy.com/dashboard/  (create app → API key)
+JAMENDO_CLIENT_ID=    # https://devportal.jamendo.com/           (register app → client id)
+```
+
+Then `php artisan config:clear`. The pickers switch from "not set up yet" to live results — no frontend change needed.
+
+---
+
+## 9. Reproducing the data
 
 ```bash
 cd backend
