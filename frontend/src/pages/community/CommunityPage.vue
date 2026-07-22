@@ -72,6 +72,7 @@
           @report="onReport"
           @delete-comment="onDeleteComment"
           @message-author="onMessageAuthor"
+          @share="onShare"
         />
 
         <div v-if="store.loadingMore" class="row justify-center q-py-md">
@@ -80,6 +81,8 @@
         <div v-else-if="!store.hasMore" class="feed-end">You're all caught up.</div>
       </div>
     </div>
+
+    <SharePostDialog v-model="shareDialog" :post="shareTarget" />
 
     <ReportDialog
       v-if="reportTarget"
@@ -99,6 +102,7 @@ import { useCommunityStore } from 'src/stores/communityStore'
 import PostCard from 'components/PostCard.vue'
 import PostComposer from 'components/PostComposer.vue'
 import ReportDialog from 'components/ReportDialog.vue'
+import SharePostDialog from 'components/SharePostDialog.vue'
 import { POST_TYPES } from 'src/utils/postTypes'
 import { useSocialStore } from 'src/stores/socialStore'
 import { useRouter } from 'vue-router'
@@ -132,6 +136,8 @@ const allDestinations = ref([])
 const activeType = ref(null)
 const openComments = ref(new Set())
 const loadingComments = ref(null)
+const shareDialog = ref(false)
+const shareTarget = ref(null)
 const reportDialog = ref(false)
 const reportTarget = ref(null)
 
@@ -209,6 +215,15 @@ const onDelete = (post) => {
       $q.notify({ color: 'negative', message: 'Could not delete post', position: 'top' })
     }
   })
+}
+
+const onShare = (post) => {
+  if (!authStore.isLoggedIn) {
+    $q.notify({ color: 'info', message: 'Log in to send posts', position: 'top' })
+    return
+  }
+  shareTarget.value = post
+  shareDialog.value = true
 }
 
 const onReport = (post) => {

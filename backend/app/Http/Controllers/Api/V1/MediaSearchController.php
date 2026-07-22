@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Proxies the GIF and music catalogues.
@@ -23,9 +24,12 @@ class MediaSearchController extends Controller
         $key = config('services.giphy.key');
 
         if (!$key) {
+            Log::info('Giphy key missing — set GIPHY_KEY in .env to enable the GIF picker.');
+
             return response()->json([
                 'configured' => false,
-                'message'    => 'GIF search is not set up yet. Add GIPHY_KEY to the backend .env.',
+                // User-facing copy only — the setup hint goes to the log, not the UI.
+                'message'    => "GIFs aren't available right now.",
                 'data'       => [],
             ]);
         }
@@ -68,9 +72,15 @@ class MediaSearchController extends Controller
             Cache::forget($cacheKey);
             return response()->json([
                 'configured' => true,
-                'message'    => 'GIF search is unavailable right now.',
+                'message'    => "GIFs aren't available right now.",
                 'data'       => [],
             ], 502);
+        }
+
+        // An empty result is usually transient upstream — don't let it stick
+        // around for the full cache window.
+        if ($data === []) {
+            Cache::forget($cacheKey);
         }
 
         return response()->json(['configured' => true, 'data' => $data]);
@@ -82,9 +92,11 @@ class MediaSearchController extends Controller
         $key = config('services.jamendo.client_id');
 
         if (!$key) {
+            Log::info('Jamendo client id missing — set JAMENDO_CLIENT_ID in .env to enable the music picker.');
+
             return response()->json([
                 'configured' => false,
-                'message'    => 'Music search is not set up yet. Add JAMENDO_CLIENT_ID to the backend .env.',
+                'message'    => "Music isn't available right now.",
                 'data'       => [],
             ]);
         }
@@ -127,9 +139,13 @@ class MediaSearchController extends Controller
             Cache::forget($cacheKey);
             return response()->json([
                 'configured' => true,
-                'message'    => 'Music search is unavailable right now.',
+                'message'    => "Music isn't available right now.",
                 'data'       => [],
             ], 502);
+        }
+
+        if ($data === []) {
+            Cache::forget($cacheKey);
         }
 
         return response()->json(['configured' => true, 'data' => $data]);

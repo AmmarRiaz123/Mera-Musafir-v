@@ -30,7 +30,10 @@
 | Video posts | Upload + inline playback, `media_type = video` |
 | GIF support | Giphy picker (hotlinked, not copied to disk); uploaded `.gif` files pass through **unflattened** so animation survives |
 | Music on posts | Royalty-free catalogue (Jamendo) with search + preview; track shown as a tappable pill over the media, like a reel's audio credit |
-| Instagram-style UI | Full-bleed media, actions under the media, double-tap-to-like with heart burst, `N likes`, inline `name + caption`, "View all N comments", relative timestamps |
+| Instagram-style UI | Full-bleed media, double-tap-to-like with heart burst, inline `name + caption`, relative timestamps |
+| **Share to DM** | Search people by name, multi-select, optional note → the post arrives as a **preview card** in their chat. If the recipient has blocked the post's author it renders as **"Post unavailable"** instead |
+| Card layout (revised) | Caption sits directly under the media; actions moved into their **own pill bar** below, with counts and labels |
+| Comment styling | Speech-bubble comments with avatars, inline timestamps and a rounded inline composer |
 
 ---
 
@@ -165,8 +168,9 @@ Backend (curl) and UI (headless Chromium), all passing with zero console errors:
 4. **Feed isn't cached.** Deliberate — the Phase 8.5 matching cache served stale results for an hour after a trip changed. Ranking is cheap here; caching can come with proper invalidation later.
 5. **`per_page` is unbounded**, so a client could request a huge page. Fine for now; worth clamping before public launch.
 6. Seeded post text is illustrative demo copy, not real user content.
-7. **The GIF and music pickers are untested against live APIs** — no keys were available. The request-building, caching, normalisation and the "not configured" path are all verified; the live responses are not. Add the keys below and re-check.
+7. GIF and music are now **verified live** (Giphy returns 24 results, Jamendo 20). Note Jamendo's search is strict — `chill` legitimately returns nothing upstream while `acoustic` returns 20.
 8. No video transcoding or poster-frame generation (see 5b).
+8b. A shared post's preview is **snapshotted** into the message. Editing the post later won't rewrite what was already sent — deliberate, but worth knowing.
 9. Music plays through a plain `<audio>` element — it doesn't mix into a video's own soundtrack the way Instagram does.
 
 ---

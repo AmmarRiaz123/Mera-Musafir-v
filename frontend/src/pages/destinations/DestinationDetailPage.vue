@@ -178,6 +178,7 @@
             @like="onLike"
             @toggle-comments="onToggleComments"
             @comment="onComment"
+            @share="onSharePost"
           />
         </div>
       </div>
@@ -194,7 +195,7 @@ import { api } from 'src/boot/axios'
 import PostCard from 'components/PostCard.vue'
 
 const route = useRoute()
-const router = useRouter() // eslint-disable-line no-unused-vars
+const router = useRouter()
 const destinationStore = useDestinationStore()
 
 const destination = computed(() => destinationStore.currentDestination)
@@ -232,6 +233,9 @@ const onToggleComments = async (post) => {
 }
 
 const onComment = (post, body) => communityStore.addComment(post, body).catch(() => {})
+
+// Sharing lives on the Community page — send them there with the post open.
+const onSharePost = (post) => router.push(`/community?post=${post.id}`)
 
 onMounted(async () => {
   const slug = route.params.slug

@@ -395,11 +395,23 @@ class ConversationController extends Controller
 
     private function formatMessage(ConversationMessage $msg, int $authId): array
     {
+        $metadata = $msg->metadata;
+
+        // A shared post is hidden if the viewer has blocked its author — the
+        // author may be a third party, so this can't be decided at send time.
+        if ($msg->type === 'post_share' && !empty($metadata['author_id'])) {
+            $authorId = (int) $metadata['author_id'];
+
+            if ($authorId !== $authId && BlockedUser::blockExistsBetween($authId, $authorId)) {
+                $metadata = ['unavailable' => true];
+            }
+        }
+
         return [
             'id'         => $msg->id,
             'body'       => $msg->body,
             'type'       => $msg->type,
-            'metadata'   => $msg->metadata,
+            'metadata'   => $metadata,
             'read_at'    => $msg->read_at,
             'is_mine'    => $msg->sender_id === $authId,
             'created_at' => $msg->created_at,

@@ -36,15 +36,17 @@
         </button>
       </div>
 
-      <q-input
-        v-model="form.body"
-        class="body-input"
-        borderless
-        autogrow
-        :rows="3"
-        maxlength="2000"
-        :placeholder="bodyPlaceholder"
-      />
+      <div class="body-wrap">
+        <q-input
+          v-model="form.body"
+          class="body-input"
+          borderless
+          autogrow
+          :rows="3"
+          maxlength="2000"
+          :placeholder="bodyPlaceholder"
+        />
+      </div>
 
       <!-- Selected media preview -->
       <div v-if="form.media_url" class="preview">
@@ -68,7 +70,7 @@
         outlined dense clearable use-input hide-selected fill-input
         input-debounce="200"
         label="Tag a destination"
-        class="q-mt-sm"
+        class="dest-select"
         @filter="filterDestinations"
       >
         <template v-slot:prepend><q-icon name="place" size="18px" color="primary" /></template>
@@ -76,6 +78,7 @@
 
       <!-- Attach bar -->
       <div class="attach-bar">
+        <span class="attach-label">Add</span>
         <button type="button" class="attach" :disabled="uploading" @click="pickFile">
           <q-icon name="image" size="20px" /><span>Photo / Video</span>
         </button>
@@ -414,22 +417,34 @@ const submit = async () => {
 </script>
 
 <style scoped>
-.composer { background: #fff; border: 1px solid #ece6f0; border-radius: 12px; margin-bottom: 14px; }
+.composer {
+  background: #fff; border: 1px solid #ece6f0; border-radius: 14px;
+  margin-bottom: 16px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(43, 27, 51, 0.03);
+}
 
-.prompt { display: flex; align-items: center; gap: 11px; padding: 12px 14px; cursor: pointer; }
+.prompt { display: flex; align-items: center; gap: 11px; padding: 13px 15px; cursor: pointer; transition: background 0.15s ease; }
+.prompt:hover { background: #fcfafd; }
 .prompt-avatar {
   background: linear-gradient(135deg, #7b1fa2, #4a148c);
   color: #fff; font-weight: 700; font-size: 13px; flex-shrink: 0;
 }
-.prompt-text { flex: 1; font-size: 13.5px; color: #9b8aa5; }
+.prompt-text {
+  flex: 1; font-size: 13.5px; color: #9b8aa5;
+  padding: 8px 14px; border-radius: 999px; background: #f7f3fa; border: 1px solid #f0eaf4;
+}
 
-.editor { padding: 12px 14px 10px; }
-.editor-head { display: flex; align-items: center; gap: 10px; }
+.editor { padding: 0; }
+.editor-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid #f4eff7;
+  background: linear-gradient(180deg, #faf7fc, #fff);
+}
 .editor-name { font-size: 13.5px; font-weight: 600; color: #2b1b33; }
 
 .type-scroll {
-  display: flex; gap: 6px; margin: 12px 0 4px;
-  overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
+  display: flex; gap: 6px; padding: 12px 14px 4px;
+  overflow-x: auto; scrollbar-width: none;
 }
 .type-scroll::-webkit-scrollbar { display: none; }
 .type-pill {
@@ -440,20 +455,33 @@ const submit = async () => {
 .type-pill:hover { border-color: #c9b3d6; }
 .type-pill--active { background: var(--q-primary); border-color: var(--q-primary); color: #fff; font-weight: 500; }
 
+.body-wrap {
+  margin: 8px 14px 0; padding: 4px 12px;
+  border: 1px solid #ece6f0; border-radius: 12px; background: #fcfafd;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.body-wrap:focus-within { border-color: #c9b3d6; background: #fff; }
 .body-input { font-size: 14px; }
 
-.preview { position: relative; margin-top: 8px; border-radius: 11px; overflow: hidden; background: #f2eef5; }
+.preview { position: relative; margin: 10px 14px 0; border-radius: 11px; overflow: hidden; background: #f2eef5; }
 .preview-el { width: 100%; max-height: 340px; object-fit: cover; display: block; }
 .preview-remove { position: absolute; top: 8px; right: 8px; background: rgba(20, 10, 26, 0.6); color: #fff; }
 
 .track-chip {
-  display: flex; align-items: center; gap: 7px; margin-top: 8px;
+  display: flex; align-items: center; gap: 7px; margin: 10px 14px 0;
   padding: 6px 8px 6px 11px; border-radius: 999px;
   background: linear-gradient(120deg, #f5eef8, #ede7f6); color: #4a148c; font-size: 12.5px;
 }
 .track-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.attach-bar { display: flex; align-items: center; gap: 4px; margin-top: 10px; flex-wrap: wrap; }
+.attach-bar {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  margin-top: 12px; padding: 8px 14px; border-top: 1px solid #f4eff7; background: #fcfafd;
+}
+.attach-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: #b0a3b8; margin-right: 4px;
+}
 .attach {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 10px; border: 0; border-radius: 9px; background: transparent;
@@ -464,10 +492,14 @@ const submit = async () => {
 .attach .q-icon { color: var(--q-primary); }
 .counter { font-size: 11.5px; color: #b0a3b8; }
 
-.uploading { display: flex; align-items: center; gap: 9px; margin-top: 8px; font-size: 12px; color: #7a6a82; }
+.uploading { display: flex; align-items: center; gap: 9px; padding: 6px 14px; font-size: 12px; color: #7a6a82; }
 .uploading .q-linear-progress { flex: 1; }
 
-.editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.editor-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 10px 14px 12px; background: #fcfafd;
+}
+.dest-select { margin: 10px 14px 0; }
 .hidden { display: none; }
 
 /* ── Pickers ────────────────────────────────────────── */

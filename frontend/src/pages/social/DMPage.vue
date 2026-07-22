@@ -41,8 +41,44 @@
           class="q-mb-sm"
           :class="isMine(msg) ? 'row justify-end' : 'row justify-start'"
         >
+          <!-- Shared community post -->
+          <div v-if="msg.type === 'post_share'" class="share-wrap">
+            <!-- Blocked the author: don't show what they posted -->
+            <div v-if="msg.metadata?.unavailable" class="share-card share-card--gone">
+              <q-icon name="visibility_off" size="20px" />
+              <div>
+                <div class="gone-title">Post unavailable</div>
+                <div class="gone-sub">You've blocked the person who posted this.</div>
+              </div>
+            </div>
+
+            <div v-else class="share-card" @click="openSharedPost(msg)">
+              <div class="share-media">
+                <img v-if="msg.metadata?.media_url && msg.metadata?.media_type !== 'video'" :src="msg.metadata.media_url" alt="" />
+                <q-icon v-else-if="msg.metadata?.media_type === 'video'" name="movie" size="22px" />
+                <q-icon v-else name="article" size="22px" />
+              </div>
+              <div class="share-text">
+                <div class="share-label">
+                  <q-icon name="forum" size="12px" />Community post
+                </div>
+                <div class="share-author">{{ msg.metadata?.author_name }}</div>
+                <div class="share-excerpt">{{ msg.metadata?.excerpt }}</div>
+                <div v-if="msg.metadata?.destination" class="share-dest">
+                  <q-icon name="place" size="11px" />{{ msg.metadata.destination }}
+                </div>
+              </div>
+              <q-icon name="chevron_right" size="18px" class="share-arrow" />
+            </div>
+
+            <div v-if="msg.body && msg.body !== 'Shared a post'" class="share-note">{{ msg.body }}</div>
+            <div class="text-caption text-grey-5 q-mt-xs" :class="isMine(msg) ? 'text-right' : 'text-left'">
+              {{ formatTime(msg.created_at) }}
+            </div>
+          </div>
+
           <!-- Trip invite card -->
-          <div v-if="msg.type === 'trip_invite'" class="invite-card" style="max-width: 320px">
+          <div v-else-if="msg.type === 'trip_invite'" class="invite-card" style="max-width: 320px">
             <q-card bordered flat>
               <q-card-section class="q-pb-xs">
                 <div class="row items-center q-gutter-xs q-mb-xs">
@@ -243,6 +279,11 @@ const atLimit = computed(() => newMessage.value.length >= MESSAGE_MAX)
 
 // Women-only trips can only be joined by women — mirrors the backend guard so
 // we never show an Accept button that is guaranteed to fail.
+const openSharedPost = (msg) => {
+  const id = msg.metadata?.post_id
+  if (id) router.push(`/community?post=${id}`)
+}
+
 const canJoinInvite = (msg) => {
   if (msg.metadata?.visibility !== 'women_only') return true
   return authStore.user?.gender === 'female'
@@ -419,6 +460,46 @@ onUnmounted(() => {
   font-size: 14px;
   box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
 }
+
+/* ── Shared community post ──────────────────────────── */
+.share-wrap { max-width: 330px; }
+.share-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 13px; cursor: pointer;
+  background: #fff; border: 1px solid #e6dcee;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.share-card:hover { border-color: #c9b3d6; transform: translateY(-1px); }
+.share-card--gone {
+  cursor: default; background: #f5f2f7; border-color: #e8e0ee; color: #8a7a92;
+}
+.share-card--gone:hover { transform: none; border-color: #e8e0ee; }
+.gone-title { font-size: 12.5px; font-weight: 600; color: #6b5a75; }
+.gone-sub { font-size: 11.5px; color: #9b8aa5; }
+
+.share-media {
+  width: 46px; height: 46px; border-radius: 9px; flex-shrink: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #7b1fa2, #4a148c); color: #fff;
+}
+.share-media img { width: 100%; height: 100%; object-fit: cover; }
+.share-text { flex: 1; min-width: 0; }
+.share-label {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: #9b8aa5;
+}
+.share-author { font-size: 12.5px; font-weight: 600; color: #2b1b33; }
+.share-excerpt {
+  font-size: 12px; color: #7a6a82; line-height: 1.35; margin-top: 1px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.share-dest {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: 11px; color: var(--q-primary); margin-top: 3px; font-weight: 500;
+}
+.share-arrow { color: #c3b3cc; flex-shrink: 0; }
+.share-note { font-size: 13px; color: #3a2d42; margin-top: 6px; }
 
 /* Women-only trip accents */
 .women-only-badge {

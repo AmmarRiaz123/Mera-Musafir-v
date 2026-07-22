@@ -7,9 +7,14 @@ use App\Http\Requests\Community\StorePostRequest;
 use App\Http\Requests\Community\UpdatePostRequest;
 use App\Http\Resources\PostResource;
 use App\Models\CommunityPost;
+use App\Models\BlockedUser;
+use App\Models\Conversation;
+use App\Models\ConversationMessage;
 use App\Models\PostLike;
+use App\Support\ImageUrl;
 use App\Services\FeedService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class CommunityPostController extends Controller
 {
@@ -74,6 +79,79 @@ class CommunityPostController extends Controller
         $post->delete();
 
         return response()->json(['message' => 'Post deleted']);
+    }
+
+    /**
+     * POST /community/posts/{post}/share — send this post into one or more DMs.
+     *
+     * The preview is snapshotted into the message metadata so the chat can render
+     * a card without an extra lookup, and so a later edit to the post doesn't
+     * silently rewrite what someone was sent.
+     */
+    public function share(Request $request, CommunityPost $post)
+    {
+        $validated = $request->validate([
+            'user_ids'   => ['required', 'array', 'min:1', 'max:10'],
+            'user_ids.*' => ['integer', 'exists:users,id'],
+            'note'       => ['nullable', 'string', 'max:500'],
+        ], [
+            'user_ids.required' => 'Choose at least one person to send this to.',
+            'user_ids.max'      => 'You can send to 10 people at a time.',
+        ]);
+
+        if ($post->is_hidden) {
+            return response()->json(['message' => 'This post is no longer available'], 404);
+        }
+
+        $senderId = $request->user()->id;
+        $post->loadMissing(['author', 'destination']);
+
+        $metadata = [
+            'post_id'      => $post->id,
+            'post_type'    => $post->type,
+            'excerpt'      => Str::limit($post->body, 140),
+            'media_url'    => ImageUrl::resolve($post->media_url),
+            'media_type'   => $post->media_type,
+            'author_id'    => $post->user_id,
+            'author_name'  => $post->author?->name,
+            'destination'  => $post->destination?->name,
+        ];
+
+        $sent    = 0;
+        $skipped = [];
+
+        foreach (array_unique($validated['user_ids']) as $recipientId) {
+            $recipientId = (int) $recipientId;
+
+            if ($recipientId === $senderId) {
+                continue;
+            }
+
+            // Sender <-> recipient block: no conversation at all.
+            if (BlockedUser::blockExistsBetween($senderId, $recipientId)) {
+                $skipped[] = $recipientId;
+                continue;
+            }
+
+            $conversation = Conversation::findOrCreateBetween($senderId, $recipientId);
+
+            ConversationMessage::create([
+                'conversation_id' => $conversation->id,
+                'sender_id'       => $senderId,
+                'body'            => $validated['note'] ?: 'Shared a post',
+                'type'            => 'post_share',
+                'metadata'        => $metadata,
+            ]);
+
+            $conversation->update(['last_message_at' => now()]);
+            $sent++;
+        }
+
+        return response()->json([
+            'message' => $sent === 1 ? 'Post sent' : "Post sent to {$sent} people",
+            'sent'    => $sent,
+            'skipped' => count($skipped),
+        ]);
     }
 
     /** POST /community/posts/{post}/like — toggles. */

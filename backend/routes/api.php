@@ -117,6 +117,7 @@ Route::prefix('v1')->group(function () {
         Route::put('/community/posts/{post}',                      [CommunityPostController::class, 'update']);
         Route::delete('/community/posts/{post}',                   [CommunityPostController::class, 'destroy']);
         Route::post('/community/posts/{post}/like',                [CommunityPostController::class, 'toggleLike']);
+        Route::post('/community/posts/{post}/share',               [CommunityPostController::class, 'share']);
         Route::post('/community/posts/{post}/comments',            [PostCommentController::class, 'store']);
         Route::delete('/community/posts/{post}/comments/{comment}', [PostCommentController::class, 'destroy']);
 
