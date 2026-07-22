@@ -154,6 +154,8 @@ Backend (curl) and UI (headless Chromium), all passing with zero console errors:
 
 **Why Jamendo and not Spotify/Apple.** Instagram can put commercial music on your reel because Meta licenses it from the labels. Spotify and Apple preview APIs explicitly forbid using clips as background audio for user content. Jamendo is Creative Commons licensed, so the artist and licence come back with each track and the UI credits them.
 
+Spotify was re-evaluated in July 2026 and ruled out again, now on technical grounds as well as licensing. Its `preview_url` — the 30-second MP3 this feature would need — returns `null` for every app registered on or after **27 Nov 2024**, with no key or scope that restores it; real playback requires the Web Playback SDK, which means each *listener* must be signed in with Spotify Premium. A client ID alone is also not enough to call the API at all: `/v1/search` needs a Client Credentials token, which requires the client secret. Don't spend time re-litigating this.
+
 **Video has no transcoding.** There is no FFmpeg in this environment, so uploads are stored as-is: a 4K phone clip stays 4K and every viewer downloads all of it. Capped at 50MB. Production needs a transcoding pipeline and a CDN.
 
 **PHP limits had to be raised.** `upload_max_filesize` defaulted to **2M**, so PHP rejected videos before Laravel ever saw the request. Added `/usr/local/etc/php/8.3/conf.d/zz-meramusafir.ini` (64M upload / 72M post / 256M memory). **Any new machine or server needs the same change** or video uploads fail with a confusing "The file failed to upload."
