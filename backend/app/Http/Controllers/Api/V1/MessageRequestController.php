@@ -60,6 +60,19 @@ class MessageRequestController extends Controller
             ['status' => 'pending', 'message' => $validated['message'] ?? null],
         );
 
+        // Follow them as part of asking.
+        //
+        // Accepting already makes the recipient follow the requester, which lets
+        // the requester keep writing. But the reply direction was never opened:
+        // if the requester also limits DMs to people they follow, the person who
+        // just accepted gets blocked answering the message they accepted. Asking
+        // to talk to someone implies wanting to hear back, so the follow goes out
+        // with the request — and the compose form says so before you send.
+        UserFollow::firstOrCreate([
+            'follower_id'  => $me,
+            'following_id' => (int) $validated['recipient_id'],
+        ]);
+
         return response()->json(['message' => 'Message request sent'], 201);
     }
 

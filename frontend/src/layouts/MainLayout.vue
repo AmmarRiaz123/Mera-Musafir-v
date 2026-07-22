@@ -72,6 +72,9 @@
                   >
                     “{{ req.message }}”
                   </q-item-label>
+                  <q-item-label caption class="mr-accept-note">
+                    Accepting opens the chat and follows them back.
+                  </q-item-label>
                   <div class="q-mt-xs q-gutter-x-sm">
                     <q-btn
                       dense
@@ -338,6 +341,12 @@
               </span>
             </div>
           </transition>
+
+          <p class="mr-follow-note">
+            <q-icon name="person_add_alt" size="13px" />
+            Sending this also follows {{ firstName }}, so they can write back once
+            they accept.
+          </p>
 
           <div class="mr-foot">
             <span class="mr-note">
@@ -629,6 +638,18 @@ const handleLogout = async () => {
 .mr-input { font-size: 13.5px; }
 /* Same autogrow trap as the composer — cap it or Send walks off the screen. */
 .mr-input :deep(textarea) { max-height: 26vh; overflow-y: auto; }
+
+.mr-follow-note {
+  display: flex; align-items: flex-start; gap: 5px;
+  margin: 9px 0 0; padding: 7px 9px;
+  border-radius: 9px; background: #f7f3fa; border: 1px solid #f0eaf4;
+  font-size: 11.5px; line-height: 1.4; color: #8a7a93;
+}
+.mr-follow-note .q-icon { margin-top: 1px; flex-shrink: 0; }
+
+.mr-accept-note {
+  margin-top: 4px; font-size: 11px; color: #a99bb2; white-space: normal;
+}
 
 .mr-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
