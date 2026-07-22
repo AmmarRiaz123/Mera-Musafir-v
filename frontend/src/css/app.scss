@@ -44,3 +44,9 @@
   .page-title { font-size: 21px; }
   .page-title--sm { font-size: 18px; }
 }
+
+/* Dialogs that should push the page back rather than just dim it. */
+.composer-dialog .q-dialog__backdrop {
+  backdrop-filter: blur(6px);
+  background: rgba(43, 27, 51, 0.42);
+}

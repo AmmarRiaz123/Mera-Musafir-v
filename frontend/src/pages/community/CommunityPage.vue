@@ -6,6 +6,17 @@
           <span class="page-eyebrow"><q-icon name="forum" size="12px" />Social</span>
           <h1 class="page-title page-title--sm">Community</h1>
         </div>
+
+        <button
+          v-if="authStore.isLoggedIn"
+          type="button"
+          class="compose-fab"
+          aria-label="New post"
+          @click="composerOpen = true"
+        >
+          <q-icon name="add" size="24px" />
+          <q-tooltip anchor="bottom middle" self="top middle">New post</q-tooltip>
+        </button>
       </header>
 
       <!-- Deep-linked single post (from a shared card) -->
@@ -42,13 +53,6 @@
       </div>
 
       <template v-else>
-      <PostComposer
-        v-if="authStore.isLoggedIn"
-        :destinations="allDestinations"
-        :is-agency="isAgency"
-        @created="onCreated"
-      />
-
       <!-- Categories -->
       <nav class="filter-row">
         <button
@@ -118,6 +122,19 @@
       </template>
     </div>
 
+    <!-- Compose in a modal so the feed keeps the full page height -->
+    <q-dialog v-model="composerOpen" class="composer-dialog" transition-show="jump-up" transition-hide="jump-down">
+      <q-card class="composer-card">
+        <PostComposer
+          dialog
+          :destinations="allDestinations"
+          :is-agency="isAgency"
+          @created="onCreated"
+          @close="composerOpen = false"
+        />
+      </q-card>
+    </q-dialog>
+
     <SharePostDialog v-model="shareDialog" :post="shareTarget" />
 
     <ReportDialog
@@ -130,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from 'src/boot/axios'
 import { useAuthStore } from 'src/stores/authStore'
@@ -154,7 +171,16 @@ const route = useRoute()
 
 const isAgency = computed(() => authStore.user?.type === 'agency')
 
-const onCreated = (post) => store.posts.unshift(post)
+const composerOpen = ref(false)
+
+const onCreated = async (post) => {
+  store.posts.unshift(post)
+  composerOpen.value = false
+  // Wait for the new card to render, otherwise the scroll fires against the
+  // old height and snap settles part-way into the post.
+  await nextTick()
+  scroller.value?.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 // "I'm interested" on a companion post opens a DM with the author.
 const onMessageAuthor = async (post) => {
@@ -362,8 +388,26 @@ onUnmounted(() => audioStore.stop())
   margin-bottom: 16px;
 }
 
-.feed-head { margin-bottom: 10px; flex-shrink: 0; }
+.feed-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 10px; flex-shrink: 0;
+}
 .feed-head-text { display: flex; flex-direction: column; }
+
+/* Compose button — replaces the always-on composer, freeing the space above
+   the feed. */
+.compose-fab {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; flex-shrink: 0;
+  border: 0; border-radius: 50%; cursor: pointer; color: #fff;
+  background: linear-gradient(135deg, #7b1fa2 0%, #4a148c 100%);
+  box-shadow: 0 3px 10px rgba(74, 20, 140, 0.32);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.compose-fab:hover { transform: translateY(-1px) scale(1.04); box-shadow: 0 6px 18px rgba(74, 20, 140, 0.4); }
+.compose-fab:active { transform: scale(0.95); }
+
+.composer-card { width: 620px; max-width: 94vw; border-radius: 16px; overflow: hidden; }
 .focus-bar {
   display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
   padding: 6px 10px; border-radius: 999px; background: #f3ecf7; border: 1px solid #e8dcf0;

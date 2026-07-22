@@ -113,7 +113,7 @@
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="drawerOpen" show-if-above bordered :width="248" class="app-drawer">
+    <q-drawer v-model="drawerOpen" bordered :width="248" :breakpoint="1023" class="app-drawer">
       <!-- Identity, not the app name again — the brand already sits in the header. -->
       <router-link
         v-if="myAgency"
@@ -368,7 +368,10 @@ const homeLink = computed(() =>
   myAgency.value ? `/agencies/${myAgency.value.slug}/dashboard?section=overview` : '/',
 )
 
-const drawerOpen = ref(false)
+// Collapsible on every screen size, and the choice sticks between visits.
+const NAV_KEY = 'nav.open'
+const savedNav = localStorage.getItem(NAV_KEY)
+const drawerOpen = ref(savedNav === null ? $q.screen.gt.sm : savedNav === 'true')
 const acting = ref(null)
 const requestBody = ref('')
 const sendingRequest = ref(false)
@@ -459,6 +462,7 @@ const ignoreRequest = async (req) => {
 
 const toggleDrawer = () => {
   drawerOpen.value = !drawerOpen.value
+  localStorage.setItem(NAV_KEY, String(drawerOpen.value))
 }
 
 const handleLogout = async () => {

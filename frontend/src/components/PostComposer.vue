@@ -1,7 +1,7 @@
 <template>
-  <section class="composer">
-    <!-- Collapsed prompt -->
-    <div v-if="!expanded" class="prompt" @click="expanded = true">
+  <section class="composer" :class="{ 'composer--dialog': dialog }">
+    <!-- Collapsed prompt (inline mode only) -->
+    <div v-if="!dialog && !expanded" class="prompt" @click="expanded = true">
       <q-avatar size="34px" class="prompt-avatar">
         <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" />
         <span v-else>{{ authStore.user?.name?.[0]?.toUpperCase() }}</span>
@@ -10,14 +10,17 @@
       <q-icon name="add_photo_alternate" size="20px" color="primary" />
     </div>
 
-    <!-- Expanded -->
+    <!-- Editor -->
     <div v-else class="editor">
       <header class="editor-head">
         <q-avatar size="34px" class="prompt-avatar">
           <img v-if="authStore.user?.avatar" :src="authStore.user.avatar" />
           <span v-else>{{ authStore.user?.name?.[0]?.toUpperCase() }}</span>
         </q-avatar>
-        <span class="editor-name">{{ authStore.user?.name }}</span>
+        <div class="editor-who">
+          <span class="editor-name">{{ authStore.user?.name }}</span>
+          <span v-if="dialog" class="editor-hint">New post</span>
+        </div>
         <q-space />
         <q-btn flat round dense size="sm" icon="close" color="grey-7" @click="reset" />
       </header>
@@ -213,13 +216,15 @@ import { POST_TYPES, travellerTypes } from 'src/utils/postTypes'
 const props = defineProps({
   destinations: { type: Array, default: () => [] },
   isAgency: { type: Boolean, default: false },
+  // In a dialog there's no collapsed state — open straight into the editor.
+  dialog: { type: Boolean, default: false },
 })
-const emit = defineEmits(['created'])
+const emit = defineEmits(['created', 'close'])
 
 const $q = useQuasar()
 const authStore = useAuthStore()
 
-const expanded = ref(false)
+const expanded = ref(props.dialog)
 const posting = ref(false)
 const uploading = ref(false)
 const fileInput = ref(null)
@@ -389,7 +394,11 @@ onUnmounted(stopPreview)
 const reset = () => {
   Object.assign(form, { body: '', type: 'story', destination_id: null, audio: null })
   media.value = []
-  expanded.value = false
+  if (props.dialog) {
+    emit('close')
+  } else {
+    expanded.value = false
+  }
 }
 
 const submit = async () => {
@@ -433,6 +442,12 @@ const submit = async () => {
 }
 
 .editor { padding: 0; max-height: 70vh; overflow-y: auto; }
+.editor-who { display: flex; flex-direction: column; line-height: 1.15; }
+.editor-hint { font-size: 11px; color: #9b8aa5; }
+
+/* Inside a dialog the card provides the frame, so drop the extra chrome. */
+.composer--dialog { border: 0; border-radius: 0; margin: 0; box-shadow: none; }
+.composer--dialog .editor { max-height: none; }
 .editor-head {
   display: flex; align-items: center; gap: 10px;
   padding: 12px 14px; border-bottom: 1px solid #f4eff7;
