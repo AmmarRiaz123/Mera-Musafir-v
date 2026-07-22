@@ -52,10 +52,27 @@ class FeedService
             }
         }
 
-        $query->select('community_posts.*')
-            ->selectRaw($this->scoreExpression($user) . ' as feed_score')
-            ->orderByDesc('feed_score')
-            ->orderByDesc('created_at');
+        $query->select('community_posts.*');
+
+        // "Recommended" is the ranked feed; the others are plain, predictable
+        // orders for people who'd rather browse than be curated.
+        match ($filters['sort'] ?? 'recommended') {
+            'new' => $query->orderByDesc('created_at'),
+
+            'top' => $query
+                ->orderByDesc('likes_count')
+                ->orderByDesc('comments_count')
+                ->orderByDesc('created_at'),
+
+            'discussed' => $query
+                ->orderByDesc('comments_count')
+                ->orderByDesc('created_at'),
+
+            default => $query
+                ->selectRaw($this->scoreExpression($user) . ' as feed_score')
+                ->orderByDesc('feed_score')
+                ->orderByDesc('created_at'),
+        };
 
         return $query->paginate($perPage);
     }

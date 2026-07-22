@@ -25,7 +25,7 @@ class CommunityPostController extends Controller
     {
         $posts = $this->feed->feed(
             auth('sanctum')->user(),
-            $request->only(['destination_id', 'type', 'user_id']),
+            $request->only(['destination_id', 'type', 'user_id', 'sort']),
             (int) ($request->per_page ?? 10),
         );
 

@@ -66,8 +66,8 @@
       <div class="q-mb-xl">
         <div class="row items-center justify-between q-mb-md">
           <div>
-            <div class="text-h6 text-weight-bold">Travel Packages Here</div>
-            <div class="text-caption text-grey-6">Packages offered by agencies for {{ destination.name }}</div>
+            <div class="text-h6 text-weight-bold">Agency packages</div>
+            <div class="text-caption text-grey-6">Organised departures sold by agencies for {{ destination.name }}</div>
           </div>
           <q-btn flat color="deep-purple" label="All Packages" icon-right="arrow_forward" to="/packages" />
         </div>
@@ -151,11 +151,102 @@
         </div>
       </div>
 
+      <!-- Traveller-created trips to this destination -->
+      <div class="q-mb-xl">
+        <div class="row items-center justify-between q-mb-md">
+          <div>
+            <div class="text-h6 text-weight-bold">Trips to {{ destination.name }}</div>
+            <div class="text-caption text-grey-6">
+              Trips other travellers are planning — join one or start your own
+            </div>
+          </div>
+          <q-btn flat color="deep-purple" label="All Trips" icon-right="arrow_forward" to="/trips" />
+        </div>
+
+        <div v-if="tripsLoading" class="row q-col-gutter-md">
+          <div v-for="n in 3" :key="n" class="col-12 col-sm-6 col-md-4">
+            <q-card flat bordered>
+              <q-skeleton height="150px" square />
+              <q-card-section><q-skeleton type="text" /><q-skeleton type="text" width="60%" /></q-card-section>
+            </q-card>
+          </div>
+        </div>
+
+        <div v-else-if="!trips.length" class="dest-empty">
+          <q-icon name="hiking" size="30px" />
+          <div>No one has planned a trip to {{ destination.name }} yet.</div>
+          <q-btn flat no-caps dense color="primary" label="Create the first trip" to="/trips/create" />
+        </div>
+
+        <div v-else class="row q-col-gutter-md">
+          <div v-for="trip in trips" :key="trip.id" class="col-12 col-sm-6 col-md-4">
+            <q-card flat bordered class="trip-card cursor-pointer" @click="$router.push(`/trips/${trip.id}`)">
+              <q-img :src="trip.cover_image" ratio="1.7778" class="bg-grey-3">
+                <div class="absolute-top-right q-pa-sm">
+                  <q-badge v-if="trip.visibility === 'women_only'" class="wo-badge">
+                    <q-icon name="female" size="11px" class="q-mr-xs" />Women only
+                  </q-badge>
+                  <q-badge v-else color="primary" class="capitalize shadow-1">{{ trip.type }}</q-badge>
+                </div>
+              </q-img>
+
+              <q-card-section class="q-pb-xs">
+                <div class="text-subtitle2 text-weight-bold ellipsis">{{ trip.title }}</div>
+                <div class="row items-center text-caption text-grey-7 q-mt-xs q-gutter-x-md">
+                  <span><q-icon name="calendar_today" size="12px" /> {{ fmtTripDate(trip.start_date) }}</span>
+                  <span><q-icon name="group" size="12px" /> {{ trip.current_count }}/{{ trip.max_travelers }}</span>
+                </div>
+              </q-card-section>
+
+              <q-card-section class="q-pt-none">
+                <q-linear-progress
+                  :value="trip.max_travelers ? trip.current_count / trip.max_travelers : 0"
+                  :color="trip.is_full ? 'negative' : 'primary'"
+                  rounded size="5px"
+                />
+                <div class="row items-center justify-between q-mt-sm">
+                  <div class="row items-center q-gutter-xs">
+                    <q-avatar size="20px">
+                      <img v-if="trip.creator?.avatar" :src="trip.creator.avatar" />
+                      <q-icon v-else name="person" size="12px" />
+                    </q-avatar>
+                    <span class="text-caption text-grey-7 ellipsis" style="max-width: 90px">
+                      {{ trip.creator?.name }}
+                    </span>
+                  </div>
+                  <span class="text-caption text-weight-bold" :class="trip.is_full ? 'text-negative' : 'text-primary'">
+                    {{ trip.is_full ? 'Full' : `${trip.spots_left} left` }}
+                  </span>
+                </div>
+              </q-card-section>
+            </q-card>
+          </div>
+        </div>
+      </div>
+
       <!-- Community posts about this destination -->
       <div class="q-mt-xl">
-        <div class="text-h6 text-weight-bold">From the community</div>
-        <div class="text-caption text-grey-6 q-mb-md">
-          Stories and tips travellers shared about {{ destination.name }}
+        <div class="row items-center justify-between q-mb-md">
+          <div>
+            <div class="text-h6 text-weight-bold">From the community</div>
+            <div class="text-caption text-grey-6">
+              Stories and tips travellers shared about {{ destination.name }}
+            </div>
+          </div>
+          <q-btn flat dense no-caps class="sort-btn" :label="postSortLabel" icon-right="expand_more">
+            <q-menu auto-close anchor="bottom right" self="top right">
+              <q-list style="min-width: 200px">
+                <q-item
+                  v-for="o in sortOptions" :key="o.value"
+                  clickable :active="postSort === o.value" active-class="sort-active"
+                  @click="setPostSort(o.value)"
+                >
+                  <q-item-section avatar><q-icon :name="o.icon" size="18px" /></q-item-section>
+                  <q-item-section>{{ o.label }}</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
         </div>
 
         <div v-if="postsLoading" class="row justify-center q-py-lg">
@@ -206,6 +297,44 @@ const pkgLoading = ref(false)
 const communityStore = useCommunityStore()
 const posts = ref([])
 const postsLoading = ref(false)
+
+const trips = ref([])
+const tripsLoading = ref(false)
+
+const sortOptions = [
+  { value: 'recommended', label: 'Recommended', icon: 'auto_awesome' },
+  { value: 'new',         label: 'Newest',      icon: 'schedule' },
+  { value: 'top',         label: 'Most liked',  icon: 'favorite' },
+  { value: 'discussed',   label: 'Most talked about', icon: 'forum' },
+]
+const postSort = ref('recommended')
+const postSortLabel = computed(
+  () => sortOptions.find((o) => o.value === postSort.value)?.label ?? 'Recommended',
+)
+
+const setPostSort = (value) => {
+  postSort.value = value
+  if (destination.value?.id) loadPosts(destination.value.id)
+}
+
+// Traveller-planned trips going to this place. Agency departures are
+// invite-only, so /trips already leaves them out of this list.
+const loadTrips = async (destinationId) => {
+  tripsLoading.value = true
+  try {
+    const r = await api.get('/api/v1/trips', {
+      params: { destination_id: destinationId, per_page: 6 },
+    })
+    trips.value = r.data.data || []
+  } catch {
+    trips.value = []
+  } finally {
+    tripsLoading.value = false
+  }
+}
+
+const fmtTripDate = (d) =>
+  d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PK', { day: 'numeric', month: 'short' }) : '—'
 const openComments = ref(new Set())
 
 // This page shows only posts tagged with this destination.
@@ -213,7 +342,7 @@ const loadPosts = async (destinationId) => {
   postsLoading.value = true
   try {
     const r = await api.get('/api/v1/community/posts', {
-      params: { destination_id: destinationId, per_page: 5 },
+      params: { destination_id: destinationId, per_page: 5, sort: postSort.value },
     })
     posts.value = r.data.data || []
   } catch {
@@ -244,6 +373,7 @@ onMounted(async () => {
       await destinationStore.fetchDestination(slug)
       if (destination.value?.id) {
         loadPackages(destination.value.id)
+        loadTrips(destination.value.id)
         loadPosts(destination.value.id)
       }
     } catch (e) {
@@ -271,6 +401,19 @@ const fmtDate = (d) => {
 </script>
 
 <style scoped>
+.trip-card { transition: transform 0.16s ease, box-shadow 0.16s ease; }
+.trip-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(43,27,51,0.09); }
+.wo-badge {
+  background: linear-gradient(135deg, #d81b60, #8e24aa); color: #fff;
+  font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+}
+.sort-btn {
+  color: #6b5a75; font-size: 12.5px; font-weight: 500;
+  border: 1px solid #e5dced; border-radius: 999px; padding: 2px 6px 2px 12px; background: #fff;
+}
+.sort-btn:hover { border-color: #c9b3d6; }
+.sort-active { background: #f3ecf7; color: var(--q-primary); }
+
 .dest-empty {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 32px 16px; border: 1px solid #ece6f0; border-radius: 13px;

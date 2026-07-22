@@ -96,7 +96,9 @@ class TripController extends Controller
             }
         }
 
-        $trips = $query->latest()->paginate(12);
+        $perPage = min(max((int) $request->input('per_page', 12), 1), 24);
+
+        $trips = $query->latest()->paginate($perPage);
 
         return TripResource::collection($trips)->additional([
             'message' => 'Trips retrieved successfully'

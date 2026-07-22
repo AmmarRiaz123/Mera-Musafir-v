@@ -53,6 +53,27 @@
       </div>
 
       <template v-else>
+      <!-- Sort -->
+      <div class="sort-row">
+        <q-btn flat dense no-caps class="sort-btn" :label="activeSortLabel" icon-right="expand_more">
+          <q-menu auto-close anchor="bottom right" self="top right">
+            <q-list style="min-width: 210px">
+              <q-item
+                v-for="o in sortOptions" :key="o.value"
+                clickable :active="activeSort === o.value" active-class="sort-active"
+                @click="setSort(o.value)"
+              >
+                <q-item-section avatar><q-icon :name="o.icon" size="19px" /></q-item-section>
+                <q-item-section>
+                  <q-item-label>{{ o.label }}</q-item-label>
+                  <q-item-label caption>{{ o.hint }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
+      </div>
+
       <!-- Categories -->
       <nav class="filter-row">
         <button
@@ -199,6 +220,23 @@ const onMessageAuthor = async (post) => {
 
 const allDestinations = ref([])
 const activeType = ref(null)
+
+const sortOptions = [
+  { value: 'recommended', label: 'Recommended', icon: 'auto_awesome',  hint: 'Ranked for you' },
+  { value: 'new',         label: 'Newest',      icon: 'schedule',      hint: 'Most recent first' },
+  { value: 'top',         label: 'Most liked',  icon: 'favorite',      hint: 'Highest likes first' },
+  { value: 'discussed',   label: 'Most talked about', icon: 'forum',   hint: 'Most comments first' },
+]
+const activeSort = ref('recommended')
+const activeSortLabel = computed(
+  () => sortOptions.find((o) => o.value === activeSort.value)?.label ?? 'Recommended',
+)
+
+const setSort = (value) => {
+  activeSort.value = value
+  store.fetchFeed(feedFilters.value)
+  scroller.value?.scrollTo({ top: 0 })
+}
 const openComments = ref(new Set())
 const loadingComments = ref(null)
 const focusedId = ref(route.query.post ? Number(route.query.post) : null)
@@ -233,7 +271,10 @@ const shareTarget = ref(null)
 const reportDialog = ref(false)
 const reportTarget = ref(null)
 
-const feedFilters = computed(() => (activeType.value ? { type: activeType.value } : {}))
+const feedFilters = computed(() => ({
+  ...(activeType.value ? { type: activeType.value } : {}),
+  sort: activeSort.value,
+}))
 
 const setType = (value) => {
   activeType.value = value
@@ -441,6 +482,14 @@ onUnmounted(() => audioStore.stop())
 .expand-enter-from, .expand-leave-to { opacity: 0; }
 
 /* Filters */
+.sort-row { display: flex; justify-content: flex-end; margin-bottom: 6px; flex-shrink: 0; }
+.sort-btn {
+  color: #6b5a75; font-size: 12.5px; font-weight: 500;
+  border: 1px solid #e5dced; border-radius: 999px; padding: 2px 6px 2px 12px; background: #fff;
+}
+.sort-btn:hover { border-color: #c9b3d6; }
+.sort-active { background: #f3ecf7; color: var(--q-primary); }
+
 .filter-row {
   display: flex; gap: 7px; margin-bottom: 12px; flex-shrink: 0;
   overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
