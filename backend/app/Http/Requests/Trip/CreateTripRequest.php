@@ -25,6 +25,7 @@ class CreateTripRequest extends FormRequest
             'budget_max'     => 'nullable|integer|min:0|gte:budget_min',
             'type'           => 'required|in:adventure,cultural,budget,luxury,backpacking',
             'visibility'     => 'required|in:public,women_only,invite_only',
+            'requires_approval' => 'sometimes|boolean',
         ];
     }
 }

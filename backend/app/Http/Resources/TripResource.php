@@ -26,6 +26,7 @@ class TripResource extends JsonResource
             'budget_max'     => $this->budget_max,
             'type'           => $this->type,
             'visibility'     => $this->visibility,
+            'requires_approval' => (bool) $this->requires_approval,
             'status'         => $this->status,
             'creator'        => new UserResource($this->whenLoaded('creator')),
             'destination'    => new DestinationResource($this->whenLoaded('destination')),

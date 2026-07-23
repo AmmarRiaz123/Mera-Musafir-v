@@ -47,7 +47,7 @@
             The host removed you from this trip before, so they'll need to approve you back in.
           </span>
           <span v-else-if="isRequest">
-            This is a private trip — the host reviews requests before you're in.
+            The host reviews each request, so you're in once they approve you.
           </span>
           <span v-else>
             You'll join the group chat and planning tools straight away.
@@ -81,7 +81,7 @@ const props = defineProps({
 })
 defineEmits(['update:modelValue', 'confirm'])
 
-const isRequest = computed(() => props.trip?.visibility === 'invite_only')
+const isRequest = computed(() => props.trip?.visibility === 'invite_only' || !!props.trip?.requires_approval)
 const wasRemoved = computed(() => !!props.trip?.viewer_removed)
 </script>
 

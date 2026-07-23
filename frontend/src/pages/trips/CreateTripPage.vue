@@ -316,6 +316,23 @@
                     />
                   </button>
                 </div>
+
+                <!-- Invite-only trips already vet each joiner; for public and
+                     women-only, let the host choose. -->
+                <div class="approval-toggle" :class="{ 'approval-toggle--locked': form.visibility === 'invite_only' }">
+                  <q-toggle
+                    :model-value="form.visibility === 'invite_only' ? true : form.requires_approval"
+                    :disable="form.visibility === 'invite_only'"
+                    color="deep-purple" size="md"
+                    @update:model-value="v => form.requires_approval = v"
+                  />
+                  <div class="approval-text">
+                    <strong>Review each request to join</strong>
+                    <small v-if="form.visibility === 'invite_only'">Invite-only trips always need your approval.</small>
+                    <small v-else-if="form.requires_approval">People request to join and you approve each one.</small>
+                    <small v-else>Anyone who fits can join instantly, no approval needed.</small>
+                  </div>
+                </div>
               </section>
 
               <!-- Summary -->
@@ -427,7 +444,8 @@ const form = ref({
   budget_min: null,
   budget_max: null,
   type: '',
-  visibility: 'public'
+  visibility: 'public',
+  requires_approval: false,
 })
 
 const typeOptions = [
@@ -565,6 +583,16 @@ const submitForm = async () => {
 </script>
 
 <style scoped>
+.approval-toggle {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 12px; padding: 12px 14px;
+  border-radius: 12px; background: #faf7fc; border: 1px solid #efe6f4;
+}
+.approval-toggle--locked { opacity: 0.85; }
+.approval-text { display: flex; flex-direction: column; }
+.approval-text strong { font-size: 13.5px; color: #2b1b33; }
+.approval-text small { font-size: 11.5px; color: #8a7a93; }
+
 .create-trip-page {
   background: #faf8fc;
   padding: 24px 16px 64px;

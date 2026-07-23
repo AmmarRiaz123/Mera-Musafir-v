@@ -26,10 +26,12 @@ class Trip extends Model
         'budget_max',
         'type',
         'visibility',
+        'requires_approval',
         'status',
     ];
 
     protected $casts = [
+        'requires_approval' => 'boolean',
         'start_date'   => 'date',
         'end_date'     => 'date',
         'max_travelers' => 'integer',

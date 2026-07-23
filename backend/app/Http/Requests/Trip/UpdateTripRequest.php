@@ -25,6 +25,7 @@ class UpdateTripRequest extends FormRequest
             'budget_max'    => 'sometimes|nullable|integer|min:0|gte:budget_min',
             'type'          => 'sometimes|in:adventure,cultural,budget,luxury,backpacking',
             'visibility'    => 'sometimes|in:public,women_only,invite_only',
+            'requires_approval' => 'sometimes|boolean',
             'status'        => 'sometimes|in:planning,active,completed,archived',
         ];
     }

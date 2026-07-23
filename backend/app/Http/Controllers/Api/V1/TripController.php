@@ -233,8 +233,12 @@ class TripController extends Controller
             ->where('status', 'removed')
             ->exists();
 
-        // Open trips join instantly; invite-only and post-removal need approval.
-        $status = ($trip->visibility === 'invite_only' || $priorRemoval) ? 'pending' : 'joined';
+        // Open trips join instantly. Invite-only, host-requires-approval, and a
+        // prior removal all mean the host reviews the request first.
+        $needsApproval = $trip->visibility === 'invite_only'
+            || $trip->requires_approval
+            || $priorRemoval;
+        $status = $needsApproval ? 'pending' : 'joined';
 
         // Reuse any previous membership row — (trip_id, user_id) is unique, so a
         // user who left and comes back must update their old row, not insert.
