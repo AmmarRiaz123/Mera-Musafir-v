@@ -175,6 +175,13 @@
               rounded
             />
           </div>
+
+          <ConflictNotice
+            v-if="!isHost && !isJoined && !trip.is_full"
+            class="q-mt-md"
+            :start="trip.start_date" :end="trip.end_date"
+            :ignore-link="`/trips/${trip.id}`"
+          />
         </q-card-section>
       </q-card>
 
@@ -397,7 +404,9 @@ import { useSocialStore } from 'src/stores/socialStore'
 import { useSafetyStore } from 'src/stores/safetyStore'
 import { useNotificationStore } from 'src/stores/notificationStore'
 import { notifyError } from 'src/utils/notify'
+import { invalidateCommitments } from 'src/utils/schedule'
 import ReportDialog from 'src/components/ReportDialog.vue'
+import ConflictNotice from 'src/components/ConflictNotice.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -455,6 +464,7 @@ const handleJoin = async () => {
   actionLoading.value = true
   try {
     const result = await tripStore.joinTrip(trip.value.id)
+    invalidateCommitments()
     $q.notify({ color: 'positive', message: result.message, icon: 'check_circle' })
   } catch (err) {
     notifyError($q, err, 'Could not join trip')

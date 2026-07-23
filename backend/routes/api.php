@@ -80,6 +80,7 @@ Route::prefix('v1')->group(function () {
 
         // Bookings — traveler's own bookings (before any wildcard booking routes)
         Route::get('/bookings/my', [BookingController::class, 'my']);
+        Route::get('/me/commitments', [\App\Http\Controllers\Api\V1\ScheduleController::class, 'commitments']);
 
         // Packages
         Route::post('/packages',                                                    [PackageController::class, 'store']);

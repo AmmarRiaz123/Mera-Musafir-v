@@ -314,6 +314,12 @@
             />
           </div>
 
+          <ConflictNotice
+            class="q-mt-md"
+            :start="pkg?.start_date" :end="pkg?.end_date"
+            :ignore-link="`/packages/${pkg?.slug}`"
+          />
+
           <div class="bk-lines">
             <div class="bk-line">
               <span>PKR {{ fmt(pkg?.price_per_person ?? 0) }} × {{ bookForm.travelers_count || 1 }}</span>
@@ -354,6 +360,8 @@ import { useAgencyStore } from 'src/stores/agencyStore'
 import { useAuthStore } from 'src/stores/authStore'
 import { api } from 'src/boot/axios'
 import ReportDialog from 'src/components/ReportDialog.vue'
+import ConflictNotice from 'src/components/ConflictNotice.vue'
+import { invalidateCommitments } from 'src/utils/schedule'
 
 const route = useRoute()
 const $q = useQuasar()
@@ -401,6 +409,7 @@ const submitBooking = async () => {
     })
     myBooking.value = r.data
     showBookDialog.value = false
+    invalidateCommitments()
     // No payment yet — the agency vets first, and you pay once they approve.
     $q.notify({
       color: 'positive', icon: 'check',
