@@ -380,21 +380,55 @@ class ConversationController extends Controller
                 return Messages::json('trip_full');
             }
 
+            // The host's invite IS the approval — it lands them straight in. An
+            // invite from a regular member still runs through the host's gate if
+            // the trip is gated (invite-only, requires-approval, or the invitee
+            // was removed before). On a fully open trip anyone could join
+            // themselves, so a member's invite just joins too.
+            $hostInvited     = $invite->inviter_id === $trip->creator_id;
+            $wasRemoved      = TripMember::where('trip_id', $trip->id)
+                ->where('user_id', $userId)->where('status', 'removed')->exists();
+            $tripIsGated     = $trip->visibility === 'invite_only'
+                || $trip->requires_approval;
+            $joinsDirectly   = $hostInvited || (!$tripIsGated && !$wasRemoved);
+            $status          = $joinsDirectly ? 'joined' : 'pending';
+
             // (trip_id, user_id) is unique — reuse the row if they were here before.
             TripMember::updateOrCreate(
                 ['trip_id' => $trip->id, 'user_id' => $userId],
                 [
-                    'status'    => 'joined',
+                    'status'    => $status,
                     'role'      => 'member',
-                    'joined_at' => now(),
+                    'joined_at' => $status === 'joined' ? now() : null,
                 ]
             );
-            $trip->increment('current_count');
+
+            if ($status === 'joined') {
+                $trip->increment('current_count');
+            }
 
             $invite->update(['status' => 'accepted']);
             $message->update(['metadata' => array_merge($message->metadata ?? [], ['status' => 'accepted'])]);
 
-            $responseMessage = 'Invite accepted! You have joined the trip.';
+            // A member's invite to a gated trip becomes a request the host still
+            // has to approve — tell the host, and be clear with the invitee.
+            if ($status === 'pending' && $trip->creator) {
+                app(\App\Services\NotificationService::class)->push(
+                    recipient: $trip->creator,
+                    type: 'trip_join',
+                    copy: [
+                        'title' => auth()->user()->name . ' wants to join ' . $trip->title,
+                        'body'  => 'They accepted an invite — approve them to add them in.',
+                        'link'  => '/trips/' . $trip->id,
+                    ],
+                    actor: auth()->user(),
+                    subject: $trip,
+                );
+            }
+
+            $responseMessage = $status === 'joined'
+                ? 'Invite accepted! You have joined the trip.'
+                : "Invite accepted — the host just needs to approve you before you're in.";
         } else {
             $invite->update(['status' => 'declined']);
             $message->update(['metadata' => array_merge($message->metadata ?? [], ['status' => 'declined'])]);
