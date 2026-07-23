@@ -1,7 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
-import Echo from 'laravel-echo'
-import Pusher from 'pusher-js'
+import { ensureEcho } from 'src/utils/echo'
 
 export const useSocialStore = defineStore('social', {
   state: () => ({
@@ -162,33 +161,10 @@ export const useSocialStore = defineStore('social', {
     // Echo / Reverb subscription for DMs
     // -------------------------------------------------------------------
     subscribeToConversation(conversationId) {
-      const token = localStorage.getItem('token')
-      if (!token) return
+      const echo = ensureEcho()
+      if (!echo) return
 
-      window.Pusher = Pusher
-
-      if (window.Echo) {
-        window.Echo.disconnect()
-      }
-
-      window.Echo = new Echo({
-        broadcaster: 'reverb',
-        key: import.meta.env.VITE_REVERB_APP_KEY,
-        wsHost: import.meta.env.VITE_REVERB_HOST || 'localhost',
-        wsPort: parseInt(import.meta.env.VITE_REVERB_PORT) || 8080,
-        wssPort: parseInt(import.meta.env.VITE_REVERB_PORT) || 8080,
-        forceTLS: false,
-        enabledTransports: ['ws', 'wss'],
-        authEndpoint: 'http://localhost:8000/broadcasting/auth',
-        auth: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-        },
-      })
-
-      window.Echo.private(`conversation.${conversationId}`).listen('.message.sent', (e) => {
+      echo.private(`conversation.${conversationId}`).listen('.message.sent', (e) => {
         this.addMessage(e)
         this.bumpConversation(conversationId, e)
       })

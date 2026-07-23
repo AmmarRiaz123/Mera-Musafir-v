@@ -1,5 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
+import { ensureEcho } from 'src/utils/echo'
 
 export const useNotificationStore = defineStore('notifications', {
   state: () => ({
@@ -160,9 +161,11 @@ export const useNotificationStore = defineStore('notifications', {
     subscribe(userId) {
       // window.Echo is owned by the chat stores and may not exist yet; the poll
       // covers us until it does, and a later subscribe() picks up the socket.
-      if (this._subscribed || !window.Echo || !userId) return
+      if (this._subscribed || !userId) return
+      const echo = ensureEcho()
+      if (!echo) return
       try {
-        window.Echo.private(`App.Models.User.${userId}`)
+        echo.private(`App.Models.User.${userId}`)
           .listen('.notification.created', (payload) => this.ingest(payload))
         this._subscribed = true
       } catch {

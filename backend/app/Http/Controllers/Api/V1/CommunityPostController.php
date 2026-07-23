@@ -26,7 +26,8 @@ class CommunityPostController extends Controller
         $posts = $this->feed->feed(
             auth('sanctum')->user(),
             $request->only(['destination_id', 'type', 'user_id', 'sort']),
-            (int) ($request->per_page ?? 10),
+            // Clamped so a client can't request an enormous page.
+            min(max((int) ($request->per_page ?? 10), 1), 30),
         );
 
         return PostResource::collection($posts)->additional(['message' => 'Feed retrieved']);
@@ -61,6 +62,10 @@ class CommunityPostController extends Controller
         ]);
 
         $post->load(['author', 'destination']);
+
+        // Nudge open feeds that a new post exists; they re-fetch on click so all
+        // per-viewer filtering still runs server-side.
+        broadcast(new \App\Events\PostCreated($post));
 
         return response()->json([
             'message' => 'Post published',

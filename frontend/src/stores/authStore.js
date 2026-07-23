@@ -1,5 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
+import { teardownEcho } from 'src/utils/echo'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -44,6 +45,7 @@ export const useAuthStore = defineStore('auth', {
       localStorage.setItem('token', data.token)
     },
     clearAuthData() {
+      teardownEcho()
       this.user = null
       this.token = null
       localStorage.removeItem('user')

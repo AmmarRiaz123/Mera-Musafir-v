@@ -54,7 +54,7 @@
       <!-- Selected media (multiple allowed) -->
       <div v-if="media.length" class="gallery-strip">
         <div v-for="(m, i) in media" :key="i" class="tile">
-          <video v-if="m.type === 'video'" :src="m.previewUrl" class="tile-el" preload="metadata" />
+          <video v-if="m.type === 'video'" :src="m.previewUrl" :poster="m.poster || undefined" class="tile-el" preload="metadata" />
           <img v-else :src="m.previewUrl" class="tile-el" alt="" />
           <span class="tile-kind" v-if="m.type !== 'image'">{{ m.type.toUpperCase() }}</span>
           <q-btn round dense unelevated class="tile-x" icon="close" size="xs" @click="media.splice(i, 1)" />
@@ -278,6 +278,44 @@ const filterDestinations = (val, update) => {
 // ── File upload ─────────────────────────────────────
 const pickFile = () => fileInput.value?.click()
 
+// Draw a video's first frame to a canvas and upload it as an image poster.
+const capturePoster = (file) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.muted = true
+  video.playsInline = true
+  video.preload = 'metadata'
+  video.src = url
+
+  const cleanup = () => URL.revokeObjectURL(url)
+
+  video.addEventListener('loadeddata', () => {
+    // A hair past zero avoids a black leading frame on some encodings.
+    video.currentTime = Math.min(0.1, video.duration || 0.1)
+  })
+  video.addEventListener('seeked', async () => {
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      canvas.getContext('2d').drawImage(video, 0, 0)
+      const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.8))
+      cleanup()
+      if (!blob) return reject(new Error('no frame'))
+
+      const fd = new FormData()
+      fd.append('file', new File([blob], 'poster.jpg', { type: 'image/jpeg' }))
+      fd.append('type', 'post_media')
+      const { data } = await api.post('/api/v1/uploads', fd, { headers: { 'Content-Type': undefined } })
+      resolve(data.path)
+    } catch (err) {
+      cleanup()
+      reject(err)
+    }
+  })
+  video.addEventListener('error', () => { cleanup(); reject(new Error('video load failed')) })
+})
+
 const onFile = async (e) => {
   const files = Array.from(e.target.files || [])
   e.target.value = ''
@@ -291,7 +329,15 @@ const onFile = async (e) => {
       fd.append('type', 'post_media')
       // Clearing Content-Type lets the browser set the multipart boundary.
       const { data } = await api.post('/api/v1/uploads', fd, { headers: { 'Content-Type': undefined } })
-      media.value.push({ url: data.path, type: data.media_type, previewUrl: data.url })
+      const item = { url: data.path, type: data.media_type, previewUrl: data.url, poster: null }
+      media.value.push(item)
+
+      // A video with no poster shows a black rectangle until it plays. Grab its
+      // first frame in the browser and upload that as the poster — no server-side
+      // transcoding needed (there's no FFmpeg here anyway).
+      if (data.media_type === 'video') {
+        capturePoster(file).then((posterPath) => { item.poster = posterPath }).catch(() => {})
+      }
     }
   } catch (err) {
     $q.notify({
@@ -462,7 +508,7 @@ const submit = async () => {
     const { data } = await api.post('/api/v1/community/posts', {
       ...form,
       body: form.body.trim(),
-      gallery: media.value.map(({ url, type }) => ({ url, type })),
+      gallery: media.value.map(({ url, type, poster }) => ({ url, type, poster: poster || null })),
     })
     emit('created', data.data)
     reset()

@@ -23,6 +23,8 @@ class StorePostRequest extends FormRequest
             'gallery'        => ['nullable', 'array', 'max:10'],
             'gallery.*.url'  => ['required', 'string', 'max:2048'],
             'gallery.*.type' => ['required', 'in:image,video,gif'],
+            // A poster frame captured client-side for videos (image URL).
+            'gallery.*.poster' => ['nullable', 'string', 'max:2048'],
             'audio.provider' => ['nullable', 'string', 'max:40'],
             'audio.id'       => ['nullable', 'string', 'max:80'],
             'audio.title'    => ['nullable', 'string', 'max:200'],

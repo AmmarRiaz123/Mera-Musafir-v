@@ -164,14 +164,14 @@ Spotify was re-evaluated in July 2026 and ruled out again, now on technical grou
 
 ## 6. Known limitations / deliberate scope cuts
 
-1. **No realtime.** New posts appear on refresh or navigation, not pushed over Reverb. Trip chat is realtime; the feed is not. Worth adding if engagement justifies it.
-2. **Moderation is data-only.** `is_hidden` / `is_flagged` exist and are respected everywhere, but there's no admin UI to set them — that belongs to Phase 11 (Admin Panel). Reports do land in the existing reports table.
+1. ~~**No realtime.**~~ **Done (July 2026).** New posts now push over Reverb. A `PostCreated` event broadcasts a lightweight `{id, author_id}` on a public `community` channel; the open feed counts them into a **"N new posts"** pill and re-fetches on click — so every per-viewer filter (blocks, suspensions, ranking) still runs server-side rather than trusting a broadcast payload. Your own posts and single-post view are ignored. This landed alongside an Echo refactor: chat, notifications and the feed now share **one** Reverb connection (`utils/echo.js`) instead of each store tearing down and recreating `window.Echo`, which had been silently killing each other's channels.
+2. ~~**Moderation is data-only.**~~ **Addressed in Phase 11.** The admin Reports queue reviews flagged posts, opens the content, and can dismiss, mark actioned, or **suspend the author** directly. `is_hidden` / `is_flagged` still have no dedicated per-post toggle, but the moderation loop (report → review → action) is closed.
 3. **No edit UI.** `PUT` works and is policy-protected, but the frontend only offers delete.
 4. **Feed isn't cached.** Deliberate — the Phase 8.5 matching cache served stale results for an hour after a trip changed. Ranking is cheap here; caching can come with proper invalidation later.
-5. **`per_page` is unbounded**, so a client could request a huge page. Fine for now; worth clamping before public launch.
+5. ~~**`per_page` is unbounded.**~~ **Done (July 2026).** Clamped to `[1, 30]` in `CommunityPostController::index`, so a client can't request an enormous page.
 6. Seeded post text is illustrative demo copy, not real user content.
-7. GIF and music are now **verified live** (Giphy returns 24 results, Jamendo 20). Note Jamendo's search is strict — `chill` legitimately returns nothing upstream while `acoustic` returns 20.
-8. No video transcoding or poster-frame generation (see 5b).
+7. GIF and music are **verified live** (Giphy returns 24 results, Jamendo 20). Jamendo's raw search is strict and intermittently empty, so the music picker now ships **curated mood shelves** (Chill, Cinematic, Road trip, Adventure, Acoustic, Desi & world, Calm, Folk) backed by tags checked to return tracks, with a 3× retry to smooth over Jamendo's occasional empty responses.
+8. ~~**No poster-frame generation.**~~ **Done (July 2026).** A video's first frame is captured **client-side** (hidden `<video>` → canvas → JPEG) when it's added in the composer, uploaded as an image, and stored as `gallery[].poster`; the feed and composer render it as the `<video poster="…">`, so a video shows a real thumbnail instead of a black rectangle before play. **Transcoding is still not possible here** — there's no FFmpeg in this environment, so a 4K clip stays 4K (capped at 50MB). Production needs a transcoding pipeline and a CDN.
 8b. A shared post's preview is **snapshotted** into the message. Editing the post later won't rewrite what was already sent — deliberate, but worth knowing.
 9. Music plays through a plain `<audio>` element — it doesn't mix into a video's own soundtrack the way Instagram does.
 

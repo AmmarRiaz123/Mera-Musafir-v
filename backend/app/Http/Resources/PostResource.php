@@ -23,8 +23,10 @@ class PostResource extends JsonResource
             // Always an array, even for older single-image posts.
             'gallery'        => collect($this->gallery ?: ($this->media_url ? [['url' => $this->media_url, 'type' => $this->media_type ?: 'image']] : []))
                 ->map(fn ($m) => [
-                    'url'  => ImageUrl::resolve($m['url'] ?? null),
-                    'type' => $m['type'] ?? 'image',
+                    'url'    => ImageUrl::resolve($m['url'] ?? null),
+                    'type'   => $m['type'] ?? 'image',
+                    // The video's poster frame, if one was captured.
+                    'poster' => !empty($m['poster']) ? ImageUrl::resolve($m['poster']) : null,
                 ])->filter(fn ($m) => !empty($m['url']))->values(),
             'audio'          => $this->audio,
             'likes_count'    => (int) $this->likes_count,

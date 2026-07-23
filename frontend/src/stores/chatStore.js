@@ -1,7 +1,6 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
-import Echo from 'laravel-echo'
-import Pusher from 'pusher-js'
+import { ensureEcho } from 'src/utils/echo'
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -37,36 +36,12 @@ export const useChatStore = defineStore('chat', {
     },
 
     subscribeToTrip(tripId) {
-      const token = localStorage.getItem('token')
-      if (!token) return
+      // One shared connection (see utils/echo) — reused, not recreated, so this
+      // no longer kills the DM, notification or community-feed channels.
+      const echo = ensureEcho()
+      if (!echo) return
 
-      // Reinitialize Echo with the current token every time we subscribe.
-      // The boot-time instance may have had a null token (user logged in after app load),
-      // which causes private channel auth to silently fail.
-      window.Pusher = Pusher
-
-      if (window.Echo) {
-        window.Echo.disconnect()
-      }
-
-      window.Echo = new Echo({
-        broadcaster:       'reverb',
-        key:               import.meta.env.VITE_REVERB_APP_KEY,
-        wsHost:            import.meta.env.VITE_REVERB_HOST || 'localhost',
-        wsPort:            parseInt(import.meta.env.VITE_REVERB_PORT) || 8080,
-        wssPort:           parseInt(import.meta.env.VITE_REVERB_PORT) || 8080,
-        forceTLS:          false,
-        enabledTransports: ['ws', 'wss'],
-        authEndpoint:      'http://localhost:8000/broadcasting/auth',
-        auth: {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept:        'application/json',
-          },
-        },
-      })
-
-      window.Echo.private(`trip.${tripId}`).listen('.message.sent', (e) => {
+      echo.private(`trip.${tripId}`).listen('.message.sent', (e) => {
         this.addMessage(e)
       })
     },

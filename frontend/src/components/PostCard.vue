@@ -66,7 +66,7 @@
         <div v-for="(m, i) in gallery" :key="i" class="slide">
           <video
             v-if="m.type === 'video'"
-            :src="m.url" class="media-el" controls playsinline preload="metadata"
+            :src="m.url" :poster="m.poster || undefined" class="media-el" controls playsinline preload="metadata"
           />
           <img v-else :src="m.url" class="media-el" alt="" />
         </div>

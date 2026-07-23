@@ -1,35 +1,9 @@
 import { defineStore, acceptHMRUpdate } from 'pinia'
 import { api } from 'src/boot/axios'
-import Echo from 'laravel-echo'
-import Pusher from 'pusher-js'
+import { ensureEcho } from 'src/utils/echo'
 
-function makeEcho() {
-  const token = localStorage.getItem('token')
-  if (!token) return null
-
-  window.Pusher = Pusher
-
-  if (window.Echo) window.Echo.disconnect()
-
-  window.Echo = new Echo({
-    broadcaster:       'reverb',
-    key:               import.meta.env.VITE_REVERB_APP_KEY,
-    wsHost:            import.meta.env.VITE_REVERB_HOST || 'localhost',
-    wsPort:            parseInt(import.meta.env.VITE_REVERB_PORT) || 8080,
-    wssPort:           parseInt(import.meta.env.VITE_REVERB_PORT) || 8080,
-    forceTLS:          false,
-    enabledTransports: ['ws', 'wss'],
-    authEndpoint:      'http://localhost:8000/broadcasting/auth',
-    auth: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept:        'application/json',
-      },
-    },
-  })
-
-  return window.Echo
-}
+// Shared connection now; kept as a thin alias so call sites don't change.
+const makeEcho = ensureEcho
 
 export const usePlanningStore = defineStore('planning', {
   state: () => ({

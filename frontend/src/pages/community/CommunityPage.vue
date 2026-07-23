@@ -54,6 +54,14 @@
       </div>
 
       <template v-else>
+      <!-- Live: new posts arrived while you were reading -->
+      <transition name="np-fade">
+        <button v-if="newCount" type="button" class="new-posts" @click="showNewPosts">
+          <q-icon name="arrow_upward" size="15px" />
+          {{ newCount }} new post{{ newCount === 1 ? '' : 's' }}
+        </button>
+      </transition>
+
       <!-- Sort -->
       <div class="sort-row">
         <q-btn flat dense no-caps class="sort-btn" :label="activeSortLabel" icon-right="expand_more">
@@ -184,6 +192,7 @@ import { POST_TYPES } from 'src/utils/postTypes'
 import { useSocialStore } from 'src/stores/socialStore'
 import { useNotificationStore } from 'src/stores/notificationStore'
 import { useRouter, useRoute } from 'vue-router'
+import { ensureEcho } from 'src/utils/echo'
 
 const $q = useQuasar()
 const authStore = useAuthStore()
@@ -402,9 +411,38 @@ watch(() => route.query.post, (id) => {
   loadFocused(focusedId.value)
 })
 
+// Realtime: a public 'community' channel just signals that a post exists; we
+// count them into a pill and re-fetch on click so all filtering runs server-side.
+const newCount = ref(0)
+let communityChannel = null
+
+const subscribeCommunity = () => {
+  if (communityChannel) return
+  const echo = ensureEcho()
+  if (!echo) return
+  try {
+    communityChannel = echo.channel('community')
+    communityChannel.listen('.post.created', (e) => {
+      // Ignore your own posts (already added optimistically) and anything while
+      // you're reading a single post.
+      if (focusedId.value) return
+      if (authStore.user && e.author_id === authStore.user.id) return
+      newCount.value += 1
+    })
+  } catch { /* no socket — the feed still refreshes on navigation */ }
+}
+
+const showNewPosts = async () => {
+  newCount.value = 0
+  await store.fetchFeed(feedFilters.value)
+  await nextTick()
+  scroller.value?.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 onMounted(async () => {
   if (focusedId.value) loadFocused(focusedId.value)
   await store.fetchFeed()
+  subscribeCommunity()
   try {
     const r = await api.get('/api/v1/destinations', { params: { per_page: 100 } })
     allDestinations.value = r.data.data || []
@@ -413,7 +451,10 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => audioStore.stop())
+onUnmounted(() => {
+  audioStore.stop()
+  if (communityChannel && window.Echo) window.Echo.leave('community')
+})
 </script>
 
 <style scoped>
@@ -503,6 +544,19 @@ onUnmounted(() => audioStore.stop())
 
 /* Filters */
 .sort-row { display: flex; justify-content: flex-end; margin-bottom: 6px; flex-shrink: 0; }
+
+.new-posts {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 auto 10px; padding: 8px 18px;
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(135deg, #7b1fa2, #4a148c); color: #fff;
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 4px 14px rgba(74, 20, 140, 0.32);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.new-posts:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(74, 20, 140, 0.4); }
+.np-fade-enter-active, .np-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.np-fade-enter-from, .np-fade-leave-to { opacity: 0; transform: translateY(-6px); }
 .sort-btn {
   color: #6b5a75; font-size: 12.5px; font-weight: 500;
   border: 1px solid #e5dced; border-radius: 999px; padding: 2px 6px 2px 12px; background: #fff;
