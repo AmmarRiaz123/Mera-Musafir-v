@@ -116,11 +116,46 @@
             <q-item-section side><q-icon name="open_in_new" size="14px" color="grey-5" /></q-item-section>
           </q-item>
 
+          <q-separator class="q-my-sm" />
+
+          <!-- Agencies can browse the whole platform to see what others offer —
+               they just can't book a package or join a trip from here. -->
+          <q-item-label header class="text-caption text-grey-6">DISCOVER</q-item-label>
+
+          <q-item clickable v-ripple to="/destinations">
+            <q-item-section avatar><q-icon name="travel_explore" /></q-item-section>
+            <q-item-section>Explore</q-item-section>
+          </q-item>
+
+          <q-item clickable v-ripple to="/packages">
+            <q-item-section avatar><q-icon name="card_travel" /></q-item-section>
+            <q-item-section>Packages</q-item-section>
+          </q-item>
+
+          <q-item clickable v-ripple to="/trips">
+            <q-item-section avatar><q-icon name="hiking" /></q-item-section>
+            <q-item-section>Trips</q-item-section>
+          </q-item>
+
+          <q-item clickable v-ripple to="/agencies">
+            <q-item-section avatar><q-icon name="business" /></q-item-section>
+            <q-item-section>Agencies</q-item-section>
+          </q-item>
+
+          <q-separator class="q-my-sm" />
+
+          <q-item-label header class="text-caption text-grey-6">SOCIAL</q-item-label>
+
           <q-item clickable v-ripple to="/community" @click="clearDot('community')">
             <q-item-section avatar>
               <q-icon name="forum" /><span v-if="nfDot('community')" class="nav-dot" />
             </q-item-section>
             <q-item-section>Community</q-item-section>
+          </q-item>
+
+          <q-item clickable v-ripple to="/people">
+            <q-item-section avatar><q-icon name="people" /></q-item-section>
+            <q-item-section>People</q-item-section>
           </q-item>
 
           <q-separator class="q-my-sm" />
