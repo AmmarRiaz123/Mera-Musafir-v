@@ -1,0 +1,119 @@
+// Shared chrome for the admin console pages. Imported per-page (scoped), so
+// these class names only apply inside an admin page's template.
+
+.admin-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 22px 40px;
+}
+
+.ap-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.ap-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  color: #241636;
+  line-height: 1.1;
+}
+.ap-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #7c6f90;
+}
+
+.ap-loading {
+  display: grid;
+  place-items: center;
+  padding: 70px 0;
+}
+
+// ── Filter row (search + segmented toggles) ──
+.ap-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.ap-search {
+  flex: 1;
+  min-width: 200px;
+}
+.ap-seg {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e7e4f0;
+}
+.ap-seg-btn {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #6f6285;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.ap-seg-btn--active {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: #fff;
+  font-weight: 600;
+}
+
+// ── Table-ish card list ──
+.ap-card {
+  background: #fff;
+  border: 1px solid #e7e4f0;
+  border-radius: 15px;
+  overflow: hidden;
+}
+.ap-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f2eff8;
+}
+.ap-row:last-child {
+  border-bottom: 0;
+}
+.ap-row:hover {
+  background: #faf9fd;
+}
+
+.ap-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 54px 24px;
+  text-align: center;
+  color: #a99bb2;
+}
+.ap-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b5a75;
+}
+
+// ── Pagination ──
+.ap-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #7c6f90;
+}

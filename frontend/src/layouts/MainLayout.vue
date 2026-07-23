@@ -228,6 +228,11 @@
           <q-item-section>Transactions</q-item-section>
         </q-item>
 
+        <q-item v-if="authStore.isAdmin" clickable v-ripple to="/admin" class="admin-link">
+          <q-item-section avatar><q-icon name="shield_person" /></q-item-section>
+          <q-item-section>Admin console</q-item-section>
+        </q-item>
+
         <q-item clickable v-ripple @click="handleLogout">
           <q-item-section avatar><q-icon name="logout" color="negative" /></q-item-section>
           <q-item-section><span class="text-negative">Logout</span></q-item-section>

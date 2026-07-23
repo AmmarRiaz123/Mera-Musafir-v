@@ -37,6 +37,11 @@ class Destination extends Model
         ];
     }
 
+    public function trips()
+    {
+        return $this->hasMany(Trip::class);
+    }
+
     public function getRouteKeyName()
     {
         return 'slug';

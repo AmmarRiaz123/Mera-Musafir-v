@@ -42,6 +42,19 @@ const routes = [
     ],
   },
   {
+    path: '/admin',
+    component: () => import('layouts/AdminLayout.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+    children: [
+      { path: '', component: () => import('pages/admin/AdminDashboardPage.vue') },
+      { path: 'users', component: () => import('pages/admin/AdminUsersPage.vue') },
+      { path: 'agencies', component: () => import('pages/admin/AdminAgenciesPage.vue') },
+      { path: 'reports', component: () => import('pages/admin/AdminReportsPage.vue') },
+      { path: 'destinations', component: () => import('pages/admin/AdminDestinationsPage.vue') },
+      { path: 'broadcast', component: () => import('pages/admin/AdminBroadcastPage.vue') },
+    ],
+  },
+  {
     path: '/login',
     component: () => import('pages/auth/LoginPage.vue'),
     meta: { guestOnly: true },

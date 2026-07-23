@@ -17,6 +17,12 @@ use App\Http\Controllers\Api\V1\PostCommentController;
 use App\Http\Controllers\Api\V1\SafetyController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\UploadController;
+use App\Http\Controllers\Api\V1\Admin\AgencyAdminController;
+use App\Http\Controllers\Api\V1\Admin\BroadcastController;
+use App\Http\Controllers\Api\V1\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Api\V1\Admin\DestinationAdminController;
+use App\Http\Controllers\Api\V1\Admin\ReportAdminController;
+use App\Http\Controllers\Api\V1\Admin\UserAdminController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
@@ -107,6 +113,27 @@ Route::prefix('v1')->group(function () {
 
         // Social graph
         Route::post('/users/{user}/follow', [UserController::class, 'follow']);
+
+        // ── Admin console (role-gated) ────────────────────────────
+        Route::middleware('admin')->prefix('admin')->group(function () {
+            Route::get('/dashboard',  [AdminDashboardController::class, 'index']);
+            Route::get('/revenue',    [AdminDashboardController::class, 'revenue']);
+
+            Route::get('/users',                    [UserAdminController::class, 'index']);
+            Route::post('/users/{user}/suspend',    [UserAdminController::class, 'toggleSuspend']);
+
+            Route::get('/agencies',                 [AgencyAdminController::class, 'index']);
+            Route::post('/agencies/{agency:id}/verify', [AgencyAdminController::class, 'toggleVerify']);
+
+            Route::get('/reports',                  [ReportAdminController::class, 'index']);
+            Route::post('/reports/{report}/resolve', [ReportAdminController::class, 'resolve']);
+
+            Route::get('/destinations',                        [DestinationAdminController::class, 'index']);
+            Route::post('/destinations/{destination:id}/feature', [DestinationAdminController::class, 'toggleFeatured']);
+            Route::post('/destinations/{destination:id}/active',  [DestinationAdminController::class, 'toggleActive']);
+
+            Route::post('/broadcast', [BroadcastController::class, 'send']);
+        });
 
         // ── Notifications ─────────────────────────────────────────
         Route::get('/notifications',         [NotificationController::class, 'index']);

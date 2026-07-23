@@ -43,6 +43,8 @@ export default defineRouter(({ store /*, ssrContext */ }) => {
       next('/')
     } else if (to.meta.requiresAgencyOwner && authStore.user?.type !== 'agency') {
       next('/')
+    } else if (to.meta.requiresAdmin && !authStore.user?.is_admin) {
+      next('/')
     } else {
       next()
     }

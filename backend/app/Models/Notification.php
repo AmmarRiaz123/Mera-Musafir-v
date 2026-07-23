@@ -28,6 +28,7 @@ class Notification extends Model
         'booking_paid'     => 'agency',
         'booking_approved' => 'bookings',
         'trip_join'        => 'trips',
+        'announcement'     => 'other',
     ];
 
     public function actor()

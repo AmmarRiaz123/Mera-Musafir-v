@@ -28,6 +28,9 @@ class UserResource extends JsonResource
             'reputation_score' => $this->reputation_score,
             'is_verified' => $this->is_verified,
             'is_blocked' => $this->is_blocked,
+            // Drives the admin console's visibility and route guard. Cheap: the
+            // roles relation loads once per model and caches.
+            'is_admin' => $this->hasRole('admin'),
             'preferences' => $this->preferences,
             'dm_privacy' => $this->dm_privacy,
             'roles' => $this->whenLoaded('roles', function () {
