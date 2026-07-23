@@ -31,6 +31,10 @@ class TripResource extends JsonResource
             'destination'    => new DestinationResource($this->whenLoaded('destination')),
             'members'        => $this->whenLoaded('joinedMembers', fn () => $this->membersWithPartySize()),
             'members_count'  => $this->current_count,
+            // Whether the current viewer was removed by the host — the join
+            // button/dialog uses it to say "request to rejoin" instead of
+            // promising an instant join the backend won't grant.
+            'viewer_removed' => $this->viewerWasRemoved(),
             'created_at'     => $this->created_at->toDateTimeString(),
         ];
     }
@@ -40,6 +44,18 @@ class TripResource extends JsonResource
      * list must say so — otherwise "6/12 filled" next to 3 names looks wrong.
      * A single query per trip; members are only ever loaded for a single trip.
      */
+    private function viewerWasRemoved(): bool
+    {
+        $userId = auth('sanctum')->id();
+
+        return $userId
+            ? \App\Models\TripMember::where('trip_id', $this->id)
+                ->where('user_id', $userId)
+                ->where('status', 'removed')
+                ->exists()
+            : false;
+    }
+
     private function membersWithPartySize()
     {
         $partySizes = $this->package_id

@@ -168,7 +168,7 @@
               v-else-if="!isHost && !isJoined && !trip.is_full && !isAgency"
               color="primary"
               unelevated
-              :label="trip.visibility === 'invite_only' ? 'Request to Join' : 'Join Trip'"
+              :label="trip.viewer_removed ? 'Request to rejoin' : (trip.visibility === 'invite_only' ? 'Request to Join' : 'Join Trip')"
               icon="add_circle"
               @click="joinDialog = true"
               :loading="actionLoading"

@@ -217,8 +217,15 @@ class TripController extends Controller
             return Messages::json('women_only');
         }
 
-        // Open trips: join instantly. Invite-only: pending approval
-        $status = $trip->visibility === 'invite_only' ? 'pending' : 'joined';
+        // A member the host removed can ask back in, but the host has to approve
+        // — otherwise a kick means nothing and they just re-add themselves.
+        $priorRemoval = TripMember::where('trip_id', $trip->id)
+            ->where('user_id', $user->id)
+            ->where('status', 'removed')
+            ->exists();
+
+        // Open trips join instantly; invite-only and post-removal need approval.
+        $status = ($trip->visibility === 'invite_only' || $priorRemoval) ? 'pending' : 'joined';
 
         // Reuse any previous membership row — (trip_id, user_id) is unique, so a
         // user who left and comes back must update their old row, not insert.
@@ -253,9 +260,11 @@ class TripController extends Controller
             );
         }
 
-        $message = $status === 'joined'
-            ? 'You have joined the trip'
-            : 'Join request sent — waiting for host approval';
+        $message = match (true) {
+            $status === 'joined' => 'You have joined the trip',
+            $priorRemoval        => 'Request sent — the host removed you before, so they need to approve you back in.',
+            default              => 'Join request sent — waiting for host approval',
+        };
 
         return response()->json(['message' => $message]);
     }
@@ -363,7 +372,8 @@ class TripController extends Controller
             $trip->decrement('current_count');
         }
 
-        $member->update(['status' => 'left']);
+        // 'removed', not 'left' — a kick is sticky: rejoining needs approval.
+        $member->update(['status' => 'removed']);
 
         // Tell them, plainly. A silent disappearance from a group chat is worse
         // than a clear "the host removed you".

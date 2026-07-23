@@ -13,7 +13,7 @@
           <q-icon v-else name="hiking" size="22px" color="deep-purple" />
         </q-avatar>
         <div class="jt-head-text">
-          <div class="jt-title">{{ isRequest ? 'Request to join' : 'Join this trip' }}</div>
+          <div class="jt-title">{{ wasRemoved ? 'Request to rejoin' : (isRequest ? 'Request to join' : 'Join this trip') }}</div>
           <div class="jt-sub">{{ trip.title }}</div>
         </div>
         <q-btn flat round dense size="sm" icon="close" color="grey-7" v-close-popup />
@@ -42,8 +42,11 @@
         />
 
         <p class="jt-note">
-          <q-icon :name="isRequest ? 'lock_clock' : 'groups'" size="13px" />
-          <span v-if="isRequest">
+          <q-icon :name="(isRequest || wasRemoved) ? 'lock_clock' : 'groups'" size="13px" />
+          <span v-if="wasRemoved">
+            The host removed you from this trip before, so they'll need to approve you back in.
+          </span>
+          <span v-else-if="isRequest">
             This is a private trip — the host reviews requests before you're in.
           </span>
           <span v-else>
@@ -56,8 +59,8 @@
         <q-btn flat no-caps color="grey-7" label="Cancel" v-close-popup />
         <q-btn
           unelevated rounded no-caps color="primary"
-          :icon="isRequest ? 'send' : 'add_circle'"
-          :label="isRequest ? 'Send request' : 'Join trip'"
+          :icon="(isRequest || wasRemoved) ? 'send' : 'add_circle'"
+          :label="(isRequest || wasRemoved) ? 'Send request' : 'Join trip'"
           :loading="loading"
           @click="$emit('confirm')"
         />
@@ -79,6 +82,7 @@ const props = defineProps({
 defineEmits(['update:modelValue', 'confirm'])
 
 const isRequest = computed(() => props.trip?.visibility === 'invite_only')
+const wasRemoved = computed(() => !!props.trip?.viewer_removed)
 </script>
 
 <style scoped>
