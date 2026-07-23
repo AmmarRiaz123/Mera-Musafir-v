@@ -67,6 +67,26 @@ class ReportAdminController extends Controller
             'actioned_at' => now(),
         ]);
 
+        // Close the loop with whoever flagged it — a report that vanishes
+        // silently makes people stop bothering. Deliberately vague about what
+        // was done: the reported user's outcome is none of the reporter's
+        // business, and 'reviewed' is an internal state that isn't an outcome.
+        if ($report->reporter && $validated['status'] !== 'reviewed') {
+            $actioned = $validated['status'] === 'actioned';
+            app(\App\Services\NotificationService::class)->push(
+                recipient: $report->reporter,
+                type: 'report_reviewed',
+                copy: [
+                    'title' => $actioned
+                        ? 'We took action on something you reported'
+                        : 'We reviewed your report',
+                    'body'  => $actioned
+                        ? 'Thanks for flagging it — you help keep Mera Musafir safe.'
+                        : "We didn't find a violation this time, but thanks for looking out.",
+                ],
+            );
+        }
+
         return response()->json(['message' => 'Report updated.']);
     }
 

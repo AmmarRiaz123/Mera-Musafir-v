@@ -113,6 +113,8 @@ const ICONS = {
   booking_approved: 'verified_user',
   booking_paid: 'payments',
   trip_join: 'groups',
+  announcement: 'campaign',
+  report_reviewed: 'gavel',
 }
 
 const onOpen = () => {
@@ -232,6 +234,8 @@ const timeAgo = (iso) => {
 .nf-badge--booking_approved { background: linear-gradient(135deg, #43a047, #2e7d32); }
 .nf-badge--booking_paid     { background: linear-gradient(135deg, #43a047, #1b5e20); }
 .nf-badge--trip_join        { background: linear-gradient(135deg, #26c6da, #0097a7); }
+.nf-badge--announcement     { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+.nf-badge--report_reviewed  { background: linear-gradient(135deg, #64748b, #475569); }
 
 .nf-item--follow            { border-left-color: #26a69a; }
 .nf-item--comment           { border-left-color: #fb8c00; }
@@ -241,6 +245,8 @@ const timeAgo = (iso) => {
 .nf-item--booking_approved,
 .nf-item--booking_paid      { border-left-color: #2e7d32; }
 .nf-item--trip_join         { border-left-color: #0097a7; }
+.nf-item--announcement      { border-left-color: #6d28d9; }
+.nf-item--report_reviewed   { border-left-color: #475569; }
 /* Read items lose the coloured edge — the accent is the "new" signal. */
 .nf-item:not(.nf-item--unread) { border-left-color: transparent; }
 
