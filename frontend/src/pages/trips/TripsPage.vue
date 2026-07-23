@@ -9,48 +9,46 @@
     </div>
 
     <!-- Filters -->
-    <div class="row q-col-gutter-md q-mb-lg">
-      <div class="col-12 col-md-4">
-        <q-input
-          v-model="search"
-          outlined
-          dense
-          debounce="400"
-          placeholder="Search trips..."
-          clearable
-          @update:model-value="val => tripStore.setFilter('search', val)"
-        >
-          <template v-slot:append>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-      </div>
-      <div class="col-12 col-sm-6 col-md-4">
-        <q-select
-          v-model="filterType"
-          :options="typeOptions"
-          outlined
-          dense
-          label="Trip Type"
-          clearable
-          @update:model-value="val => tripStore.setFilter('type', val)"
-        />
-      </div>
-      <div class="col-12 col-sm-6 col-md-4">
-        <q-select
-          v-model="filterVisibility"
-          :options="visibilityOptions"
-          outlined
-          dense
-          label="Visibility"
-          clearable
-          @update:model-value="val => tripStore.setFilter('visibility', val)"
-        />
-      </div>
-    </div>
+    <div class="tp-filters">
+      <q-input
+        v-model="search"
+        class="tp-search" outlined dense rounded clearable
+        debounce="350" placeholder="Search trips by name…"
+        @update:model-value="val => tripStore.setFilter('search', val || '')"
+      >
+        <template #prepend><q-icon name="search" color="deep-purple" /></template>
+      </q-input>
 
-    <div class="row q-mb-md">
-      <q-btn flat color="primary" label="Clear Filters" @click="clearFilters" v-if="hasFilters" />
+      <div class="tp-chip-rows">
+        <div class="tp-chip-row">
+          <span class="tp-chip-label">Type</span>
+          <button
+            type="button" class="tp-chip" :class="{ 'tp-chip--active': !filterType }"
+            @click="setType(null)"
+          >All</button>
+          <button
+            v-for="t in typeOptions" :key="t"
+            type="button" class="tp-chip capitalize" :class="{ 'tp-chip--active': filterType === t }"
+            @click="setType(t)"
+          >{{ t }}</button>
+        </div>
+
+        <div class="tp-chip-row">
+          <span class="tp-chip-label">Access</span>
+          <button
+            v-for="opt in visibilityOptions" :key="opt.value ?? 'all'"
+            type="button" class="tp-chip"
+            :class="{ 'tp-chip--active': filterVisibility === opt.value, 'tp-chip--women': opt.value === 'women_only' }"
+            @click="setVisibility(opt.value)"
+          >
+            <q-icon v-if="opt.icon" :name="opt.icon" size="13px" />{{ opt.label }}
+          </button>
+
+          <button v-if="hasFilters" type="button" class="tp-chip tp-chip--clear" @click="clearFilters">
+            <q-icon name="close" size="13px" />Clear
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Loading -->
@@ -178,10 +176,23 @@ const filterVisibility = ref(null)
 const currentPage = ref(1)
 
 const typeOptions = ['adventure', 'cultural', 'budget', 'luxury', 'backpacking']
+// null = no filter. Only browsable visibilities belong here — invite-only trips
+// never appear in browse, so they're not an option.
 const visibilityOptions = [
-  { label: 'Public', value: 'public' },
-  { label: 'Women Only', value: 'women_only' }
+  { label: 'Everyone', value: null },
+  { label: 'Public', value: 'public', icon: 'public' },
+  { label: 'Women only', value: 'women_only', icon: 'female' },
 ]
+
+// A chip toggles its filter off if it's already active.
+const setType = (t) => {
+  filterType.value = filterType.value === t ? null : t
+  tripStore.setFilter('type', filterType.value || '')
+}
+const setVisibility = (v) => {
+  filterVisibility.value = v
+  tripStore.setFilter('visibility', v || '')
+}
 
 const hasFilters = computed(() => !!search.value || !!filterType.value || !!filterVisibility.value)
 
@@ -224,4 +235,41 @@ const formatBudget = (amount) => {
 .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
 .card-hover:hover { transform: translateY(-4px); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
 .bg-dark-transparent { background: rgba(0,0,0,0.55); }
+
+/* ── Filter bar ─────────────────────────────────────── */
+.tp-filters {
+  display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px;
+}
+.tp-search {
+  max-width: 460px;
+}
+.tp-search :deep(.q-field__control) {
+  background: #fff; border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(43, 27, 51, 0.05);
+}
+.tp-search :deep(.q-field__control):hover:before { border-color: #c9b3d6; }
+
+.tp-chip-rows { display: flex; flex-direction: column; gap: 10px; }
+.tp-chip-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.tp-chip-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #a99bb2; margin-right: 4px; min-width: 44px;
+}
+.tp-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 13px; border-radius: 999px; cursor: pointer;
+  border: 1px solid #e5dced; background: #fff;
+  font-size: 12.5px; font-weight: 500; color: #6b5a75;
+  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+.tp-chip:hover { border-color: #c9b3d6; background: #fcfafd; }
+.tp-chip--active {
+  background: linear-gradient(135deg, #7b1fa2, #4a148c);
+  border-color: transparent; color: #fff; font-weight: 600;
+}
+.tp-chip--women.tp-chip--active {
+  background: linear-gradient(135deg, #d81b60, #ad1457);
+}
+.tp-chip--clear { color: #9b8aa5; border-style: dashed; }
+.tp-chip--clear:hover { color: #c62828; border-color: #e0b9bd; }
 </style>
