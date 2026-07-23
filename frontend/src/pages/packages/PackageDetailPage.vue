@@ -228,13 +228,18 @@
 
               <q-card-actions class="q-px-md q-pb-md">
                 <q-btn
-                  v-if="!hasActiveBooking && !pkg.is_full && pkg.status === 'published' && !isOwnAgency"
+                  v-if="!hasActiveBooking && !pkg.is_full && pkg.status === 'published' && !isOwnAgency && !isAgency"
                   unelevated
                   color="deep-purple"
                   label="Book Now"
                   class="full-width"
                   @click="showBookDialog = true"
                 />
+                <!-- An agency viewing someone else's package can look, not book. -->
+                <div v-else-if="isAgency && !isOwnAgency" class="pkg-agency-note">
+                  <q-icon name="storefront" size="15px" />
+                  Agency accounts can't book packages — this view is for reference.
+                </div>
                 <q-btn
                   v-else-if="pkg.is_full"
                   disable
@@ -378,6 +383,8 @@ const pkg = computed(() => store.currentPackage)
 const isOwnAgency = computed(() =>
   pkg.value?.agency?.user?.id === authStore.user?.id
 )
+// Agency accounts sell, they don't buy — no booking from a business account.
+const isAgency = computed(() => authStore.user?.type === 'agency')
 // A cancelled booking shouldn't block re-booking — only pending/confirmed do.
 const hasActiveBooking = computed(() =>
   !!myBooking.value && myBooking.value.status !== 'cancelled'
@@ -490,6 +497,15 @@ const fmt = (n) => Number(n || 0).toLocaleString()
   background: linear-gradient(120deg, #faf5fd 0%, #f4ecf8 100%);
   border: 1px solid #ece0f2;
 }
+/* Shown in place of Book Now when a business account is browsing. */
+.pkg-agency-note {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 11px 12px; border-radius: 11px;
+  background: #f6f2fe; border: 1px solid #e6dcf7;
+  font-size: 12px; color: #6b5a75; line-height: 1.4;
+}
+.pkg-agency-note .q-icon { color: #7b1fa2; flex-shrink: 0; }
+
 .agency-card-title {
   font-size: 13px;
   font-weight: 700;

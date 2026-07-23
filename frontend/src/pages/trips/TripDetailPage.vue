@@ -165,7 +165,7 @@
               rounded
             />
             <q-btn
-              v-else-if="!isHost && !isJoined && !trip.is_full"
+              v-else-if="!isHost && !isJoined && !trip.is_full && !isAgency"
               color="primary"
               unelevated
               :label="trip.visibility === 'invite_only' ? 'Request to Join' : 'Join Trip'"
@@ -174,6 +174,10 @@
               :loading="actionLoading"
               rounded
             />
+            <div v-else-if="isAgency && !isHost && !isJoined" class="trip-agency-note">
+              <q-icon name="storefront" size="15px" />
+              Agency accounts can't join traveller trips.
+            </div>
           </div>
         </q-card-section>
       </q-card>
@@ -428,6 +432,8 @@ const inviteName = ref('')
 
 const trip = computed(() => tripStore.currentTrip)
 
+const isAgency = computed(() => authStore.user?.type === 'agency')
+
 const isHost = computed(() => {
   if (!trip.value || !authStore.user) return false
   return trip.value.creator?.id === authStore.user.id
@@ -571,6 +577,14 @@ const reportMember = (member) => {
 </script>
 
 <style scoped>
+.trip-agency-note {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 12px; border-radius: 10px;
+  background: #f6f2fe; border: 1px solid #e6dcf7;
+  font-size: 12px; color: #6b5a75;
+}
+.trip-agency-note .q-icon { color: #7b1fa2; }
+
 .capitalize { text-transform: capitalize; }
 .bg-purple-1 { background: #f3e5f5; }
 

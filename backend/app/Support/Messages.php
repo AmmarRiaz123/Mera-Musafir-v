@@ -82,6 +82,10 @@ class Messages
             "You can message travellers who've contacted you or booked with you 💬 It keeps their inbox free of cold pitches.",
             403,
         ],
+        'agency_cannot_book' => [
+            "Agency accounts can't book packages 🧳 That's a traveller thing — your account is for selling, not buying.",
+            403,
+        ],
     ];
 
     public static function text(string $code): string

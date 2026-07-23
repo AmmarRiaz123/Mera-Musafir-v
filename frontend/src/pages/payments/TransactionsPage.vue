@@ -18,10 +18,18 @@
       <div v-else-if="!items.length" class="tx-empty">
         <q-icon name="account_balance_wallet" size="40px" />
         <div class="tx-empty-title">No payments yet</div>
-        <p class="tx-empty-text">
-          Book an agency package and the receipt will show up here.
-        </p>
-        <q-btn unelevated rounded no-caps color="deep-purple" label="Browse packages" to="/packages" />
+        <template v-if="isAgency">
+          <p class="tx-empty-text">
+            Your plan payments show up here once you upgrade.
+          </p>
+          <q-btn unelevated rounded no-caps color="deep-purple" label="View plans" to="/subscription" />
+        </template>
+        <template v-else>
+          <p class="tx-empty-text">
+            Book an agency package and the receipt will show up here.
+          </p>
+          <q-btn unelevated rounded no-caps color="deep-purple" label="Browse packages" to="/packages" />
+        </template>
       </div>
 
       <div v-else class="tx-list">
@@ -64,6 +72,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { api } from 'src/boot/axios'
+import { useAuthStore } from 'src/stores/authStore'
+
+const authStore = useAuthStore()
+const isAgency = computed(() => authStore.user?.type === 'agency')
 
 const items = ref([])
 const loading = ref(true)

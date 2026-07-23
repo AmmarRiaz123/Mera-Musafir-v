@@ -215,9 +215,10 @@ class PackageController extends Controller
             return response()->json(['message' => 'This package is not available for booking'], 422);
         }
 
-        $userAgency = $request->user()->agency;
-        if ($userAgency && $userAgency->id === $package->agency_id) {
-            return response()->json(['message' => "You cannot book your own agency's package."], 422);
+        // Agency accounts sell, they don't buy. Blocking only the owner's own
+        // package left an agency free to book a competitor's — this closes that.
+        if ($request->user()->type === 'agency') {
+            return \App\Support\Messages::json('agency_cannot_book');
         }
 
         $validated = $request->validate([
