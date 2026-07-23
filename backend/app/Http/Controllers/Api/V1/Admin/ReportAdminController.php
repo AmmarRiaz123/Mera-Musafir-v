@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AgencyPackage;
 use App\Models\CommunityPost;
+use App\Models\Message;
 use App\Models\Report;
 use App\Models\User;
 use App\Support\ImageUrl;
@@ -38,6 +39,9 @@ class ReportAdminController extends Controller
                 // The thing reported, resolved to something a moderator can open
                 // and judge — a person, a post, a package.
                 'subject'     => $this->describeSubject($r),
+                // The person behind it, so a moderator can suspend them straight
+                // from the report without hunting them down in the users table.
+                'offender'    => $this->offender($r),
             ])->items(),
             'meta' => [
                 'total'        => $reports->total(),
@@ -57,9 +61,25 @@ class ReportAdminController extends Controller
     public function resolve(Request $request, Report $report)
     {
         $validated = $request->validate([
-            'status' => 'required|in:actioned,dismissed,reviewed',
-            'note'   => 'nullable|string|max:1000',
+            'status'  => 'required|in:actioned,dismissed,reviewed',
+            'note'    => 'nullable|string|max:1000',
+            // When true, suspend the person behind the report as part of
+            // actioning it — the whole point of a moderation queue.
+            'suspend' => 'nullable|boolean',
         ]);
+
+        if (!empty($validated['suspend'])) {
+            $offender = $this->offenderModel($report);
+
+            if (!$offender) {
+                return response()->json(['message' => 'That account is no longer here to suspend.'], 422);
+            }
+            if ($offender->hasRole('admin')) {
+                return response()->json(['message' => "You can't suspend an admin."], 422);
+            }
+
+            $offender->update(['is_blocked' => true]);
+        }
 
         $report->update([
             'status'      => $validated['status'],
@@ -88,6 +108,41 @@ class ReportAdminController extends Controller
         }
 
         return response()->json(['message' => 'Report updated.']);
+    }
+
+    /**
+     * The user behind a report, resolved through whatever was flagged: the
+     * reported user directly, a post's author, a package's agency owner, a
+     * message's sender. Null if that account is gone.
+     */
+    private function offenderModel(Report $report): ?User
+    {
+        $type = class_basename($report->reported_type);
+
+        return match ($type) {
+            'User'          => User::find($report->reported_id),
+            'CommunityPost' => CommunityPost::find($report->reported_id)?->author,
+            'AgencyPackage' => AgencyPackage::find($report->reported_id)?->agency?->user,
+            'Message'       => Message::find($report->reported_id)?->sender,
+            default         => null,
+        };
+    }
+
+    /** The offender flattened for the list — name, current status, whether they can be suspended. */
+    private function offender(Report $report): ?array
+    {
+        $user = $this->offenderModel($report);
+
+        if (!$user) {
+            return null;
+        }
+
+        return [
+            'id'           => $user->id,
+            'name'         => $user->name,
+            'is_suspended' => (bool) $user->is_blocked,
+            'is_admin'     => $user->hasRole('admin'),
+        ];
     }
 
     private function describeSubject(Report $report): array

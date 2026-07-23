@@ -56,8 +56,23 @@
           </span>
 
           <div v-if="r.status === 'pending'" class="rp-actions">
-            <q-btn flat no-caps dense size="sm" color="grey-7" label="Dismiss" :loading="acting === r.id" @click="openResolve(r, 'dismissed')" />
-            <q-btn unelevated rounded no-caps dense size="sm" color="negative" label="Mark actioned" :loading="acting === r.id" @click="openResolve(r, 'actioned')" />
+            <span v-if="r.offender?.is_suspended" class="rp-susp-tag">
+              <q-icon name="block" size="12px" />{{ firstName(r.offender.name) }} suspended
+            </span>
+            <q-btn flat no-caps dense size="sm" color="grey-7" label="Dismiss" :loading="acting === r.id" @click="openResolve(r, 'dismiss')" />
+            <q-btn
+              v-if="canSuspend(r)"
+              unelevated rounded no-caps dense size="sm" color="negative"
+              :label="`Suspend ${firstName(r.offender.name)}`"
+              icon="block"
+              :loading="acting === r.id" @click="openResolve(r, 'suspend')"
+            />
+            <q-btn
+              v-else
+              flat no-caps dense size="sm" color="deep-purple"
+              label="Mark actioned"
+              :loading="acting === r.id" @click="openResolve(r, 'actioned')"
+            />
           </div>
           <span v-else-if="r.admin_note" class="rp-note">Note: {{ r.admin_note }}</span>
         </div>
@@ -74,15 +89,11 @@
     <q-dialog v-model="resolveOpen" class="admin-resolve-dialog">
       <q-card class="rr-card">
         <div class="rr-head">
-          <q-icon :name="pending.action === 'actioned' ? 'gavel' : 'do_not_disturb_on'" size="18px" />
-          <span>{{ pending.action === 'actioned' ? 'Mark as actioned' : 'Dismiss report' }}</span>
+          <q-icon :name="dialogMeta.icon" size="18px" />
+          <span>{{ dialogMeta.title }}</span>
         </div>
         <div class="rr-body">
-          <p class="rr-lead">
-            {{ pending.action === 'actioned'
-              ? 'Record that you acted on this — suspend or remove the offender separately if needed.'
-              : 'Close this report as not a violation.' }}
-          </p>
+          <p class="rr-lead">{{ dialogMeta.lead }}</p>
           <q-input
             v-model="note" type="textarea" outlined autogrow :rows="2" :maxlength="1000"
             placeholder="Add a note for the record (optional)…"
@@ -92,8 +103,8 @@
           <q-btn flat no-caps color="grey-7" label="Cancel" v-close-popup />
           <q-btn
             unelevated rounded no-caps
-            :color="pending.action === 'actioned' ? 'negative' : 'deep-purple'"
-            :label="pending.action === 'actioned' ? 'Confirm' : 'Dismiss'"
+            :color="dialogMeta.color"
+            :label="dialogMeta.cta"
             :loading="acting === pending.id"
             @click="submitResolve"
           />
@@ -104,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from 'src/boot/axios'
 
@@ -126,8 +137,9 @@ const status = ref('pending')
 const page = ref(1)
 
 const resolveOpen = ref(false)
-const pending = reactive({ id: null, action: null })
+const pending = reactive({ id: null, action: null, offenderId: null })
 const note = ref('')
+const dialogMeta = computed(() => DIALOGS[pending.action] ?? DIALOGS.dismiss)
 
 const REASONS = {
   spam: 'Spam', harassment: 'Harassment', inappropriate_content: 'Inappropriate',
@@ -135,6 +147,29 @@ const REASONS = {
 }
 const reasonLabel = (r) => REASONS[r] ?? r
 const kindIcon = (k) => ({ user: 'person', post: 'photo', package: 'card_travel', message: 'mail' }[k] ?? 'flag')
+
+const firstName = (name) => (name || 'them').split(' ')[0]
+
+// Suspend is offered only when there's a real, non-admin account behind the
+// report that isn't already suspended.
+const canSuspend = (r) => r.offender && !r.offender.is_admin && !r.offender.is_suspended
+
+// The resolve dialog wears three hats: suspend the offender, mark handled, or
+// dismiss. Each maps to the API status and a suspend flag in submitResolve.
+const DIALOGS = {
+  suspend: {
+    icon: 'block', title: 'Suspend & close', color: 'negative', cta: 'Suspend',
+    lead: 'Suspends the account behind this report platform-wide and closes the report as actioned. You can reinstate them later from Users.',
+  },
+  actioned: {
+    icon: 'gavel', title: 'Mark as actioned', color: 'deep-purple', cta: 'Confirm',
+    lead: 'Record that you handled this — removed the content, warned them, or dealt with it elsewhere.',
+  },
+  dismiss: {
+    icon: 'do_not_disturb_on', title: 'Dismiss report', color: 'deep-purple', cta: 'Dismiss',
+    lead: 'Close this report as not a violation. The reporter is told it was reviewed.',
+  },
+}
 
 const load = async () => {
   loading.value = true
@@ -153,6 +188,7 @@ const go = (p) => { page.value = p; load() }
 const openResolve = (report, action) => {
   pending.id = report.id
   pending.action = action
+  pending.offenderId = report.offender?.id ?? null
   note.value = ''
   resolveOpen.value = true
 }
@@ -160,13 +196,32 @@ const openResolve = (report, action) => {
 const submitResolve = async () => {
   acting.value = pending.id
   try {
+    const map = {
+      suspend:  { status: 'actioned', suspend: true },
+      actioned: { status: 'actioned', suspend: false },
+      dismiss:  { status: 'dismissed', suspend: false },
+    }[pending.action] ?? { status: 'dismissed', suspend: false }
+
     await api.post(`/api/v1/admin/reports/${pending.id}/resolve`, {
-      status: pending.action,
+      ...map,
       note: note.value || null,
     })
     resolveOpen.value = false
-    $q.notify({ color: 'positive', icon: 'check_circle', message: 'Report closed.', position: 'top' })
-    // Drop it from the open queue and refresh the badge.
+    $q.notify({
+      color: 'positive', icon: 'check_circle', position: 'top',
+      message: map.suspend ? 'Suspended and report closed.' : 'Report closed.',
+    })
+
+    // Suspending one report's offender applies to every other open report
+    // against the same person — reflect that so their other cards flip from
+    // "Suspend" to "Mark actioned" without a reload.
+    if (map.suspend && pending.offenderId) {
+      reports.value.forEach((r) => {
+        if (r.offender?.id === pending.offenderId) r.offender.is_suspended = true
+      })
+    }
+
+    // Drop the resolved one from the open queue and refresh the badge.
     if (status.value === 'pending') {
       reports.value = reports.value.filter((r) => r.id !== pending.id)
     } else {
@@ -243,7 +298,13 @@ onMounted(load)
 .rp-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
 .rp-reporter { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #8b7ea6; }
 .rp-rep-avatar { background: #efe4f6; color: #6a3f86; font-weight: 700; font-size: 10px; }
-.rp-actions { display: flex; gap: 6px; }
+.rp-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rp-susp-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  background: #fdecec; color: #dc2626;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+}
 .rp-note { font-size: 11.5px; color: #7c6f90; font-style: italic; }
 
 .rr-card { width: 420px; max-width: 94vw; border-radius: 15px; overflow: hidden; }
