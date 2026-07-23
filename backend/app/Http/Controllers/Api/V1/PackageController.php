@@ -22,6 +22,8 @@ class PackageController extends Controller
     {
         $query = AgencyPackage::with(['agency', 'destination'])
             ->where('status', 'published')
+            // Nothing from a suspended agency's owner shows in browse.
+            ->whereHas('agency.user', fn ($q) => $q->where('is_blocked', false))
             ->orderBy('start_date');
 
         if ($request->destination_id) {

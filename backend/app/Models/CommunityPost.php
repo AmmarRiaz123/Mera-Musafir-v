@@ -50,7 +50,10 @@ class CommunityPost extends Model
     /** Everything a traveller is allowed to see. */
     public function scopeVisible(Builder $query): Builder
     {
-        return $query->where('is_hidden', false);
+        // A suspended author's posts drop out everywhere at once — this scope
+        // backs the feed, the community page, destination pages and profiles.
+        return $query->where('is_hidden', false)
+            ->whereHas('author', fn ($q) => $q->where('is_blocked', false));
     }
 
     public function isLikedBy(?int $userId): bool

@@ -52,7 +52,9 @@ class TripController extends Controller
     {
         $query = Trip::with(['creator', 'destination'])
             ->where('status', '!=', 'archived')
-            ->where('visibility', '!=', 'invite_only');
+            ->where('visibility', '!=', 'invite_only')
+            // A suspended host's trips disappear from browse.
+            ->whereHas('creator', fn ($q) => $q->where('is_blocked', false));
 
         // Filter by destination
         if ($request->destination_id) {

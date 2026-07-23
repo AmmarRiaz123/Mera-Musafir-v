@@ -14,6 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Suspended accounts are refused on every request, not just at login.
+        $middleware->api(append: [
+            \App\Http\Middleware\EnsureNotSuspended::class,
+        ]);
+
         $middleware->alias([
             'agency.tier' => \App\Http\Middleware\RequireAgencyTier::class,
             'admin'       => \App\Http\Middleware\EnsureAdmin::class,

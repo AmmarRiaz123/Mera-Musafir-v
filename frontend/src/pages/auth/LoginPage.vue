@@ -58,10 +58,11 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const form = reactive({
@@ -70,7 +71,7 @@ const form = reactive({
 })
 
 const isLoading = ref(false)
-const errorMessage = ref('')
+const errorMessage = ref(route.query.suspended ? 'Your account has been suspended. Contact support if you think this is a mistake.' : '')
 
 const onSubmit = async () => {
   isLoading.value = true

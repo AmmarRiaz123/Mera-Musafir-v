@@ -22,7 +22,10 @@ class UserController extends Controller
 
         // People discovery is traveller-to-traveller: business and admin
         // accounts are not browsable profiles.
-        $query = User::where('type', 'traveler')->withCount(['followers', 'following']);
+        // A suspended account drops out of discovery entirely.
+        $query = User::where('type', 'traveler')
+            ->where('is_blocked', false)
+            ->withCount(['followers', 'following']);
 
         if ($authUser) {
             $query->where('id', '!=', $authUser->id);
@@ -132,6 +135,14 @@ class UserController extends Controller
             return response()->json(['message' => 'User not found'], 404);
         }
 
+        // A suspended account is invisible — to everyone but an admin (who needs
+        // to still open it from the console) and the owner (whose own requests
+        // are already refused by the suspension middleware, so this never runs
+        // for them anyway).
+        if ($user->is_blocked && !($authUser && $authUser->hasRole('admin'))) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
         $resource = new UserResource($user);
 
         // Always expose social-graph fields (fresh counts straight from the DB)
@@ -237,6 +248,7 @@ class UserController extends Controller
             : collect();
 
         $people = User::whereIn('id', $ids)
+            ->where('is_blocked', false)
             ->orderByDesc('is_verified')
             ->orderBy('name')
             ->get();
@@ -282,6 +294,10 @@ class UserController extends Controller
 
         if ($authId === $user->id) {
             return response()->json(['message' => 'Cannot follow yourself'], 422);
+        }
+
+        if ($user->is_blocked) {
+            return response()->json(['message' => 'That account is unavailable.'], 422);
         }
 
         $existing = UserFollow::where('follower_id', $authId)
