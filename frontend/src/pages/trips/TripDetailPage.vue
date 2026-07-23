@@ -170,18 +170,11 @@
               unelevated
               :label="trip.visibility === 'invite_only' ? 'Request to Join' : 'Join Trip'"
               icon="add_circle"
-              @click="handleJoin"
+              @click="joinDialog = true"
               :loading="actionLoading"
               rounded
             />
           </div>
-
-          <ConflictNotice
-            v-if="!isHost && !isJoined && !trip.is_full"
-            class="q-mt-md"
-            :start="trip.start_date" :end="trip.end_date"
-            :ignore-link="`/trips/${trip.id}`"
-          />
         </q-card-section>
       </q-card>
 
@@ -390,7 +383,14 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-  </q-page>
+      <JoinTripDialog
+      v-model="joinDialog"
+      :trip="trip"
+      :loading="actionLoading"
+      @confirm="handleJoin"
+    />
+
+</q-page>
 </template>
 
 <script setup>
@@ -406,7 +406,7 @@ import { useNotificationStore } from 'src/stores/notificationStore'
 import { notifyError } from 'src/utils/notify'
 import { invalidateCommitments } from 'src/utils/schedule'
 import ReportDialog from 'src/components/ReportDialog.vue'
-import ConflictNotice from 'src/components/ConflictNotice.vue'
+import JoinTripDialog from 'src/components/JoinTripDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -460,11 +460,14 @@ onMounted(() => {
 // fire again — without this, trip → trip navigation shows the previous trip.
 watch(() => route.params.id, (id) => loadTrip(id))
 
+const joinDialog = ref(false)
+
 const handleJoin = async () => {
   actionLoading.value = true
   try {
     const result = await tripStore.joinTrip(trip.value.id)
     invalidateCommitments()
+    joinDialog.value = false
     $q.notify({ color: 'positive', message: result.message, icon: 'check_circle' })
   } catch (err) {
     notifyError($q, err, 'Could not join trip')
