@@ -4,7 +4,7 @@
       <q-toolbar>
         <q-btn flat dense round icon="menu" class="lt-md" @click="drawer = !drawer" />
         <div class="admin-brand">
-          <q-icon name="shield_person" size="20px" />
+          <q-icon name="admin_panel_settings" size="20px" />
           <span>Mera Musafir <b>Admin</b></span>
         </div>
         <q-space />

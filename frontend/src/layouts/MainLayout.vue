@@ -264,7 +264,7 @@
         </q-item>
 
         <q-item v-if="authStore.isAdmin" clickable v-ripple to="/admin" class="admin-link">
-          <q-item-section avatar><q-icon name="shield_person" /></q-item-section>
+          <q-item-section avatar><q-icon name="admin_panel_settings" /></q-item-section>
           <q-item-section>Admin console</q-item-section>
         </q-item>
 
