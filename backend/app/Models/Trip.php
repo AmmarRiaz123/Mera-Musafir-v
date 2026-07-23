@@ -73,6 +73,15 @@ class Trip extends Model
                     ->withTimestamps();
     }
 
+    // People waiting for the host to approve their join request.
+    public function pendingMembers()
+    {
+        return $this->belongsToMany(User::class, 'trip_members')
+                    ->withPivot('status', 'role', 'joined_at')
+                    ->wherePivot('status', 'pending')
+                    ->withTimestamps();
+    }
+
     // Check if trip is full
     public function isFull(): bool
     {

@@ -146,6 +146,9 @@
             <div class="text-subtitle1 text-weight-bold text-positive" v-else-if="isJoined">
               <q-icon name="check_circle" color="positive" class="q-mr-xs" />You're in this trip
             </div>
+            <div class="text-subtitle1 text-weight-bold" v-else-if="isPending" style="color:#b45309">
+              <q-icon name="hourglass_top" color="orange-9" class="q-mr-xs" />Your request is pending
+            </div>
             <div class="text-subtitle1" v-else-if="trip.is_full">
               <q-icon name="block" color="negative" class="q-mr-xs" />This trip is full
             </div>
@@ -163,6 +166,11 @@
               @click="confirmLeave"
               :loading="actionLoading"
               rounded
+            />
+            <q-btn
+              v-if="isPending"
+              color="orange-8" outline rounded disable
+              icon="hourglass_top" label="Awaiting approval"
             />
             <q-btn
               v-else-if="!isHost && !isJoined && !trip.is_full && !isAgency"
@@ -195,6 +203,37 @@
             <div class="text-caption text-grey-7" v-if="trip.creator.city">{{ trip.creator.city }}</div>
           </div>
         </div>
+      </div>
+
+      <!-- Join requests awaiting the host's approval -->
+      <div v-if="isHost && pendingRequests.length" class="q-mb-xl">
+        <div class="text-h6 q-mb-md">
+          Join requests
+          <q-badge color="orange" class="q-ml-sm">{{ pendingRequests.length }}</q-badge>
+        </div>
+        <q-card v-for="req in pendingRequests" :key="req.id" flat bordered class="pending-req q-mb-sm">
+          <div class="row items-center no-wrap q-pa-sm q-gutter-sm">
+            <q-avatar size="42px" class="cursor-pointer" @click="$router.push(`/profile/${req.id}`)">
+              <img v-if="req.avatar" :src="req.avatar" />
+              <q-icon v-else name="person" />
+            </q-avatar>
+            <div class="col" style="min-width:0">
+              <div class="row items-center q-gutter-xs">
+                <span class="text-weight-bold ellipsis">{{ req.name }}</span>
+                <q-icon v-if="req.is_verified" name="verified" size="15px" color="deep-purple" />
+              </div>
+              <div class="text-caption text-grey-6 ellipsis">{{ req.city || 'Wants to join' }}</div>
+            </div>
+            <q-btn
+              flat no-caps dense color="grey-7" label="Decline"
+              :loading="reqActing === req.id" @click="declineRequest(req)"
+            />
+            <q-btn
+              unelevated rounded no-caps dense color="positive" icon="check" label="Approve"
+              :loading="reqActing === req.id" @click="approveRequest(req)"
+            />
+          </div>
+        </q-card>
       </div>
 
       <!-- Suggested travelers (host only) -->
@@ -451,6 +490,39 @@ const isJoined = computed(() => {
   if (!trip.value || !authStore.user) return false
   return trip.value.members?.some(m => m.id === authStore.user.id)
 })
+
+// A join request the host hasn't approved yet.
+const isPending = computed(() => trip.value?.viewer_status === 'pending')
+
+// Pending requests the host can approve/decline (host-only field).
+const pendingRequests = computed(() => trip.value?.pending_members || [])
+const reqActing = ref(null)
+
+const approveRequest = async (req) => {
+  reqActing.value = req.id
+  try {
+    await api.post(`/api/v1/trips/${trip.value.id}/members/${req.id}/approve`)
+    await loadTrip(trip.value.id)
+    $q.notify({ color: 'positive', icon: 'check_circle', message: `${req.name} approved`, position: 'top' })
+  } catch (err) {
+    $q.notify({ color: 'negative', message: err.response?.data?.message || 'Could not approve.', position: 'top' })
+  } finally {
+    reqActing.value = null
+  }
+}
+
+const declineRequest = async (req) => {
+  reqActing.value = req.id
+  try {
+    await api.post(`/api/v1/trips/${trip.value.id}/members/${req.id}/remove`)
+    await loadTrip(trip.value.id)
+    $q.notify({ color: 'positive', icon: 'check_circle', message: `${req.name}'s request declined`, position: 'top' })
+  } catch (err) {
+    $q.notify({ color: 'negative', message: err.response?.data?.message || 'Could not decline.', position: 'top' })
+  } finally {
+    reqActing.value = null
+  }
+}
 
 const loadTrip = async (id) => {
   if (!id) return

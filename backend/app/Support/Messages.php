@@ -28,6 +28,10 @@ class Messages
             "You're already on this trip 🎒 No need to join twice.",
             422,
         ],
+        'join_pending' => [
+            "Your request to join is already in — the host just needs to approve it ⏳",
+            422,
+        ],
         'trip_full' => [
             "This trip is fully packed 🧳 Every seat is taken — but there are more adventures out there.",
             422,

@@ -30,11 +30,24 @@ class TripResource extends JsonResource
             'creator'        => new UserResource($this->whenLoaded('creator')),
             'destination'    => new DestinationResource($this->whenLoaded('destination')),
             'members'        => $this->whenLoaded('joinedMembers', fn () => $this->membersWithPartySize()),
+            // Pending join requests — only the host needs (or should) see them.
+            'pending_members' => $this->when(
+                auth('sanctum')->id() === $this->creator_id,
+                fn () => $this->pendingMembers->map(fn ($u) => [
+                    'id'          => $u->id,
+                    'name'        => $u->name,
+                    'avatar'      => \App\Support\ImageUrl::resolve($u->avatar),
+                    'city'        => $u->city,
+                    'is_verified' => (bool) $u->is_verified,
+                    'requested_at' => $u->pivot->created_at,
+                ]),
+            ),
             'members_count'  => $this->current_count,
-            // Whether the current viewer was removed by the host — the join
-            // button/dialog uses it to say "request to rejoin" instead of
-            // promising an instant join the backend won't grant.
-            'viewer_removed' => $this->viewerWasRemoved(),
+            // The viewer's own membership status ('joined'|'pending'|'removed'|
+            // 'left'|null) so the join UI can show "request pending" or "request
+            // to rejoin" instead of promising an instant join.
+            'viewer_status'  => $this->viewerStatus(),
+            'viewer_removed' => $this->viewerStatus() === 'removed',
             'created_at'     => $this->created_at->toDateTimeString(),
         ];
     }
@@ -44,16 +57,25 @@ class TripResource extends JsonResource
      * list must say so — otherwise "6/12 filled" next to 3 names looks wrong.
      * A single query per trip; members are only ever loaded for a single trip.
      */
-    private function viewerWasRemoved(): bool
+    private ?string $cachedViewerStatus = null;
+    private bool $viewerStatusResolved = false;
+
+    private function viewerStatus(): ?string
     {
+        if ($this->viewerStatusResolved) {
+            return $this->cachedViewerStatus;
+        }
+        $this->viewerStatusResolved = true;
+
         $userId = auth('sanctum')->id();
 
-        return $userId
+        $this->cachedViewerStatus = $userId
             ? \App\Models\TripMember::where('trip_id', $this->id)
                 ->where('user_id', $userId)
-                ->where('status', 'removed')
-                ->exists()
-            : false;
+                ->value('status')
+            : null;
+
+        return $this->cachedViewerStatus;
     }
 
     private function membersWithPartySize()

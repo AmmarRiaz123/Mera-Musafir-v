@@ -131,7 +131,7 @@ class TripController extends Controller
             'name'    => $trip->title . ' Chat',
         ]);
 
-        $trip->load(['creator', 'destination', 'joinedMembers']);
+        $trip->load(['creator', 'destination', 'joinedMembers', 'pendingMembers']);
 
         return response()->json([
             'message' => 'Trip created successfully',
@@ -149,7 +149,7 @@ class TripController extends Controller
             return response()->json(['message' => 'Trip not found'], 404);
         }
 
-        $trip->load(['creator', 'destination', 'joinedMembers']);
+        $trip->load(['creator', 'destination', 'joinedMembers', 'pendingMembers']);
 
         return response()->json([
             'message' => 'Trip retrieved successfully',
@@ -165,7 +165,7 @@ class TripController extends Controller
         // Visibility/type/date changes alter who this trip should be shown to.
         $matching->clearTripCache($trip->id);
 
-        $trip->load(['creator', 'destination', 'joinedMembers']);
+        $trip->load(['creator', 'destination', 'joinedMembers', 'pendingMembers']);
 
         return response()->json([
             'message' => 'Trip updated successfully',
@@ -207,9 +207,18 @@ class TripController extends Controller
             return Messages::json('trip_full');
         }
 
-        // Check if already a member
-        if ($trip->hasMember($user->id)) {
-            return Messages::json('already_joined');
+        // Already joined, or already waiting? These feel identical to hasMember
+        // but read very differently to the user — "you're already in" vs "your
+        // request is pending" — so split them.
+        $existingMembership = TripMember::where('trip_id', $trip->id)
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['joined', 'pending'])
+            ->first();
+
+        if ($existingMembership) {
+            return Messages::json(
+                $existingMembership->status === 'pending' ? 'join_pending' : 'already_joined'
+            );
         }
 
         // Enforce women-only restriction
@@ -368,23 +377,30 @@ class TripController extends Controller
             return Messages::json('not_a_member');
         }
 
+        // Declining a pending request reads differently from kicking a member
+        // who was already in — tailor the message to which it was.
+        $wasPending = $member->status === 'pending';
+
         if ($member->status === 'joined') {
             $trip->decrement('current_count');
         }
 
-        // 'removed', not 'left' — a kick is sticky: rejoining needs approval.
+        // 'removed', not 'left' — a kick (or a decline) is sticky: coming back
+        // needs the host's approval.
         $member->update(['status' => 'removed']);
 
-        // Tell them, plainly. A silent disappearance from a group chat is worse
-        // than a clear "the host removed you".
         $removed = \App\Models\User::find($userId);
         if ($removed) {
             app(\App\Services\NotificationService::class)->push(
                 recipient: $removed,
                 type: 'trip_join',
                 copy: [
-                    'title' => 'You were removed from ' . $trip->title,
-                    'body'  => 'The host removed you from this trip.',
+                    'title' => $wasPending
+                        ? 'Your request to join ' . $trip->title . " wasn't approved"
+                        : 'You were removed from ' . $trip->title,
+                    'body'  => $wasPending
+                        ? "The host declined your request. You can ask again."
+                        : 'The host removed you from this trip.',
                     'link'  => '/trips',
                 ],
                 actor: auth()->user(),
