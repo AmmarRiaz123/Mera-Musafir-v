@@ -78,7 +78,15 @@ const onSubmit = async () => {
   
   try {
     await authStore.login(form)
-    router.push('/')
+    // Agencies land on their dashboard, admins on the console, travellers home.
+    const u = authStore.user
+    if (u?.type === 'agency' && u.agency_slug) {
+      router.push(`/agencies/${u.agency_slug}/dashboard?section=overview`)
+    } else if (u?.is_admin) {
+      router.push('/admin')
+    } else {
+      router.push('/')
+    }
   } catch (error) {
     if (error.response?.data?.errors?.email) {
       errorMessage.value = error.response.data.errors.email[0]

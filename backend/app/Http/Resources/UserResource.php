@@ -31,6 +31,9 @@ class UserResource extends JsonResource
             // Drives the admin console's visibility and route guard. Cheap: the
             // roles relation loads once per model and caches.
             'is_admin' => $this->hasRole('admin'),
+            // Lets the app route an agency to its own dashboard instead of the
+            // traveller home. Only resolved for agency accounts.
+            'agency_slug' => $this->type === 'agency' ? $this->agency?->slug : null,
             'preferences' => $this->preferences,
             'dm_privacy' => $this->dm_privacy,
             'roles' => $this->whenLoaded('roles', function () {
