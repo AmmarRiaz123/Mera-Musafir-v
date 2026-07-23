@@ -24,88 +24,7 @@
           <q-tooltip>Create Trip</q-tooltip>
         </q-btn>
 
-        <q-btn flat dense round icon="notifications" aria-label="Notifications" class="q-ml-xs">
-          <q-badge v-if="notificationStore.count > 0" color="deep-purple" floating>
-            {{ notificationStore.count }}
-          </q-badge>
-          <q-tooltip>Message requests</q-tooltip>
-
-          <q-menu anchor="bottom right" self="top right" style="min-width: 320px; max-width: 360px">
-            <div class="text-subtitle2 text-weight-bold q-px-md q-pt-md q-pb-sm text-grey-9">
-              Message Requests
-            </div>
-            <q-separator />
-
-            <div
-              v-if="notificationStore.requests.length === 0"
-              class="text-center q-py-xl text-grey-5"
-            >
-              <q-icon name="notifications_none" size="2.5em" />
-              <div class="text-caption q-mt-xs">No new requests</div>
-            </div>
-
-            <q-list v-else separator>
-              <q-item v-for="req in notificationStore.requests" :key="req.id">
-                <q-item-section avatar>
-                  <q-avatar size="40px" color="grey-3" text-color="grey-8">
-                    <img v-if="req.requester.avatar" :src="req.requester.avatar" />
-                    <span v-else class="text-weight-bold">
-                      {{ req.requester.name?.[0]?.toUpperCase() }}
-                    </span>
-                  </q-avatar>
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="text-weight-medium">
-                    {{ req.requester.name }}
-                    <q-icon
-                      v-if="req.requester.is_verified"
-                      name="verified"
-                      color="deep-purple"
-                      size="16px"
-                    />
-                  </q-item-label>
-                  <q-item-label caption>wants to message you</q-item-label>
-                  <q-item-label
-                    v-if="req.message"
-                    class="text-body2 text-grey-8 q-mt-xs"
-                    style="white-space: normal"
-                  >
-                    “{{ req.message }}”
-                  </q-item-label>
-                  <q-item-label caption class="mr-accept-note">
-                    Accepting opens the chat and follows them back.
-                  </q-item-label>
-                  <div class="q-mt-xs q-gutter-x-sm">
-                    <q-btn
-                      dense
-                      unelevated
-                      size="sm"
-                      color="deep-purple"
-                      label="Accept"
-                      :loading="acting === req.id"
-                      @click="acceptRequest(req)"
-                    />
-                    <q-btn
-                      dense
-                      flat
-                      size="sm"
-                      color="grey-7"
-                      label="Ignore"
-                      :loading="acting === req.id"
-                      @click="ignoreRequest(req)"
-                    />
-                  </div>
-                </q-item-section>
-              </q-item>
-            </q-list>
-
-            <q-separator />
-            <q-item clickable v-close-popup to="/privacy" dense class="text-grey-7">
-              <q-item-section class="text-caption">Manage who can message you</q-item-section>
-              <q-item-section side><q-icon name="chevron_right" size="18px" /></q-item-section>
-            </q-item>
-          </q-menu>
-        </q-btn>
+        <NotificationBell />
 
         <q-btn flat dense round :to="`/profile`" class="q-ml-xs">
           <q-avatar size="32px">
@@ -163,8 +82,10 @@
             <q-item-section>Packages</q-item-section>
           </q-item>
 
-          <q-item clickable v-ripple :to="agencyLink('bookings')">
-            <q-item-section avatar><q-icon name="book_online" /></q-item-section>
+          <q-item clickable v-ripple :to="agencyLink('bookings')" @click="clearDot('agency')">
+            <q-item-section avatar>
+              <q-icon name="book_online" /><span v-if="nfDot('agency')" class="nav-dot" />
+            </q-item-section>
             <q-item-section>Bookings</q-item-section>
             <q-item-section side v-if="agencyStore.pendingBookings > 0">
               <q-badge color="orange" :label="agencyStore.pendingBookings" rounded />
@@ -195,8 +116,10 @@
             <q-item-section side><q-icon name="open_in_new" size="14px" color="grey-5" /></q-item-section>
           </q-item>
 
-          <q-item clickable v-ripple to="/community">
-            <q-item-section avatar><q-icon name="forum" /></q-item-section>
+          <q-item clickable v-ripple to="/community" @click="clearDot('community')">
+            <q-item-section avatar>
+              <q-icon name="forum" /><span v-if="nfDot('community')" class="nav-dot" />
+            </q-item-section>
             <q-item-section>Community</q-item-section>
           </q-item>
 
@@ -230,8 +153,10 @@
             <q-item-section>Create Trip</q-item-section>
           </q-item>
 
-          <q-item clickable v-ripple to="/my-trips">
-            <q-item-section avatar><q-icon name="luggage" /></q-item-section>
+          <q-item clickable v-ripple to="/my-trips" @click="clearDot('trips')">
+            <q-item-section avatar>
+              <q-icon name="luggage" /><span v-if="nfDot('trips')" class="nav-dot" />
+            </q-item-section>
             <q-item-section>My Trips</q-item-section>
           </q-item>
 
@@ -253,8 +178,10 @@
 
           <q-item-label header class="text-caption text-grey-6">SOCIAL</q-item-label>
 
-          <q-item clickable v-ripple to="/community">
-            <q-item-section avatar><q-icon name="forum" /></q-item-section>
+          <q-item clickable v-ripple to="/community" @click="clearDot('community')">
+            <q-item-section avatar>
+              <q-icon name="forum" /><span v-if="nfDot('community')" class="nav-dot" />
+            </q-item-section>
             <q-item-section>Community</q-item-section>
           </q-item>
 
@@ -266,8 +193,10 @@
 
         <q-item-label v-if="myAgency" header class="text-caption text-grey-6">ACCOUNT</q-item-label>
 
-        <q-item clickable v-ripple to="/messages">
-          <q-item-section avatar><q-icon name="chat" /></q-item-section>
+        <q-item clickable v-ripple to="/messages" @click="clearDot('messages')">
+          <q-item-section avatar>
+            <q-icon name="chat" /><span v-if="nfDot('messages')" class="nav-dot" />
+          </q-item-section>
           <q-item-section>Messages</q-item-section>
           <q-item-section side v-if="unreadCount > 0">
             <q-badge color="deep-purple" :label="unreadCount" rounded />
@@ -278,15 +207,19 @@
 
         <q-item-label v-if="!myAgency" header class="text-caption text-grey-6">ACCOUNT</q-item-label>
 
-        <q-item clickable v-ripple to="/profile">
-          <q-item-section avatar><q-icon name="person" /></q-item-section>
+        <q-item clickable v-ripple to="/profile" @click="clearDot('profile')">
+          <q-item-section avatar>
+            <q-icon name="person" /><span v-if="nfDot('profile')" class="nav-dot" />
+          </q-item-section>
           <q-item-section>Profile</q-item-section>
         </q-item>
 
         <!-- Traveller-only: agencies sell packages, they don't book them.
              Points at the My Trips tab so bookings live in exactly one place. -->
-        <q-item v-if="!myAgency" clickable v-ripple to="/my-trips?tab=packages">
-          <q-item-section avatar><q-icon name="confirmation_number" /></q-item-section>
+        <q-item v-if="!myAgency" clickable v-ripple to="/my-trips?tab=packages" @click="clearDot('bookings')">
+          <q-item-section avatar>
+            <q-icon name="confirmation_number" /><span v-if="nfDot('bookings')" class="nav-dot" />
+          </q-item-section>
           <q-item-section>My Bookings</q-item-section>
         </q-item>
 
@@ -397,12 +330,18 @@ import { useNotificationStore } from 'src/stores/notificationStore'
 import { useAgencyStore } from 'src/stores/agencyStore'
 import { MESSAGE_MAX, clampMessage, overflowFromPaste, notifyTrimmed } from 'src/utils/messageLimit'
 import AppLogo from 'components/AppLogo.vue'
+import NotificationBell from 'components/NotificationBell.vue'
 
 const $q = useQuasar()
 const router = useRouter()
 const authStore = useAuthStore()
 const socialStore = useSocialStore()
 const notificationStore = useNotificationStore()
+
+// A red dot on a sidebar tab whenever that category has unread notifications;
+// tapping the tab clears it.
+const nfDot = (category) => notificationStore.hasDot(category)
+const clearDot = (category) => notificationStore.markCategoryRead(category)
 const agencyStore = useAgencyStore()
 
 const myAgency = computed(() => agencyStore.myAgency)
@@ -417,7 +356,6 @@ const homeLink = computed(() =>
 const NAV_KEY = 'nav.open'
 const savedNav = localStorage.getItem(NAV_KEY)
 const drawerOpen = ref(savedNav === null ? $q.screen.gt.sm : savedNav === 'true')
-const acting = ref(null)
 const requestBody = ref('')
 const firstName = computed(
   () => notificationStore.promptUser?.name?.split(' ')[0] ?? 'They',
@@ -443,7 +381,7 @@ onMounted(async () => {
   if (!authStore.user) return
 
   socialStore.fetchConversations()
-  notificationStore.fetchRequests()
+  notificationStore.start(authStore.user.id)
 
   // Agency owners get a business console in the drawer instead of the
   // traveler-only nav, so resolve their agency up front.
@@ -452,32 +390,6 @@ onMounted(async () => {
     if (agency?.slug) agencyStore.fetchPendingCount(agency.slug)
   }
 })
-
-const acceptRequest = async (req) => {
-  acting.value = req.id
-  try {
-    const conversationId = await notificationStore.accept(req)
-    await socialStore.fetchConversations()
-    router.push(`/messages/${conversationId}`)
-  } catch (e) {
-    console.error('acceptRequest failed', e)
-    // A 404 means the request was already handled/removed — just refresh.
-    if (e.response?.status === 404) {
-      await notificationStore.fetchRequests()
-    }
-    const detail = e.response
-      ? `${e.response.status}: ${e.response.data?.message || 'server error'}`
-      : `network/JS error: ${e.message}`
-    $q.notify({
-      type: 'negative',
-      message: `Could not accept — ${detail}`,
-      position: 'top',
-      timeout: 8000,
-    })
-  } finally {
-    acting.value = null
-  }
-}
 
 const submitRequest = async () => {
   sendingRequest.value = true
@@ -492,28 +404,13 @@ const submitRequest = async () => {
   }
 }
 
-const ignoreRequest = async (req) => {
-  acting.value = req.id
-  try {
-    await notificationStore.dismiss(req.id)
-  } catch (e) {
-    console.error('ignoreRequest failed', e)
-    $q.notify({
-      type: 'negative',
-      message: e.response?.data?.message || 'Could not dismiss the request',
-      position: 'top',
-    })
-  } finally {
-    acting.value = null
-  }
-}
-
 const toggleDrawer = () => {
   drawerOpen.value = !drawerOpen.value
   localStorage.setItem(NAV_KEY, String(drawerOpen.value))
 }
 
 const handleLogout = async () => {
+  notificationStore.stop()
   await authStore.logout()
   router.push('/login')
 }
@@ -531,6 +428,14 @@ const handleLogout = async () => {
 
 /* ── Drawer identity ────────────────────────────────── */
 .app-drawer { background: #fcfafd; }
+
+/* A red dot sitting on the tab's icon — the "something happened here" signal. */
+.q-item__section--avatar { position: relative; }
+.nav-dot {
+  position: absolute; top: -1px; right: 10px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #e53935; border: 2px solid #fcfafd;
+}
 
 .identity {
   display: flex;

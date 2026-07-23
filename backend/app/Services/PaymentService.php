@@ -128,6 +128,21 @@ class PaymentService
             // the whole reason a package booking is worth having.
             $this->bookings->confirm($payable);
 
+            $package = $payable->agencyPackage;
+            if ($package?->agency?->user) {
+                app(\App\Services\NotificationService::class)->push(
+                    recipient: $package->agency->user,
+                    type: 'booking_paid',
+                    copy: [
+                        'title' => $payable->user->name . ' paid for ' . $package->title,
+                        'body'  => 'PKR ' . number_format($payment->net_amount) . ' after platform fee',
+                        'link'  => '/agencies/' . $package->agency->slug . '/dashboard',
+                    ],
+                    actor: $payable->user,
+                    subject: $payable,
+                );
+            }
+
             return;
         }
 

@@ -50,6 +50,20 @@ class PostCommentController extends Controller
         $this->feed->syncCounters($post);
         $comment->load('author');
 
+        if ($post->author) {
+            app(\App\Services\NotificationService::class)->push(
+                recipient: $post->author,
+                type: 'comment',
+                copy: [
+                    'title' => $request->user()->name . ' commented on your post',
+                    'body'  => \Illuminate\Support\Str::limit($comment->body ?: 'Shared something', 60),
+                    'link'  => '/community?post=' . $post->id,
+                ],
+                actor: $request->user(),
+                subject: $post,
+            );
+        }
+
         return response()->json([
             'message'        => 'Comment added',
             'data'           => new CommentResource($comment),

@@ -251,6 +251,21 @@ class PackageController extends Controller
         $package->increment('booked_count', $validated['travelers_count']);
         $booking->load('agencyPackage');
 
+        if ($package->agency?->user) {
+            app(\App\Services\NotificationService::class)->push(
+                recipient: $package->agency->user,
+                type: 'booking_request',
+                copy: [
+                    'title' => $request->user()->name . ' requested to book ' . $package->title,
+                    'body'  => $validated['travelers_count'] . ' traveller'
+                        . ($validated['travelers_count'] === 1 ? '' : 's') . ' — review to let them pay',
+                    'link'  => '/agencies/' . $package->agency->slug . '/dashboard',
+                ],
+                actor: $request->user(),
+                subject: $booking,
+            );
+        }
+
         return response()->json([
             'message' => 'Request sent. The agency will review it before you pay.',
             'data'    => new BookingResource($booking),
@@ -288,6 +303,21 @@ class PackageController extends Controller
         // Approval is the agency's vet, not the end of the process: it opens a
         // payment window. The traveller is seated once they actually pay.
         app(BookingService::class)->approve($booking);
+        $booking->refresh();
+
+        if ($booking->user) {
+            app(\App\Services\NotificationService::class)->push(
+                recipient: $booking->user,
+                type: 'booking_approved',
+                copy: [
+                    'title' => $package->agency->business_name . ' approved your booking',
+                    'body'  => 'Pay within 48 hours to lock in your seat on ' . $package->title,
+                    'link'  => '/my-trips?tab=packages',
+                ],
+                actor: $package->agency->user,
+                subject: $booking,
+            );
+        }
 
         return response()->json([
             'message' => 'Booking approved — the traveller can now pay.',

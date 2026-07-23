@@ -184,8 +184,24 @@ class CommunityPostController extends Controller
             $liked = false;
         } else {
             // Idempotent: a double-tap can't create two likes.
-            PostLike::firstOrCreate(['community_post_id' => $post->id, 'user_id' => $userId]);
+            $like = PostLike::firstOrCreate(['community_post_id' => $post->id, 'user_id' => $userId]);
             $liked = true;
+
+            // Only on a genuinely new like, and only if the author is watching
+            // their own post's reactions — never notify a re-like.
+            if ($like->wasRecentlyCreated && $post->author) {
+                app(\App\Services\NotificationService::class)->push(
+                    recipient: $post->author,
+                    type: 'like',
+                    copy: [
+                        'title' => $request->user()->name . ' liked your post',
+                        'body'  => \Illuminate\Support\Str::limit($post->body, 60),
+                        'link'  => '/community?post=' . $post->id,
+                    ],
+                    actor: $request->user(),
+                    subject: $post,
+                );
+            }
         }
 
         // Derive the counter from the rows rather than incrementing, so it can

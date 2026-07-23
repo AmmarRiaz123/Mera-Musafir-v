@@ -295,6 +295,17 @@ class UserController extends Controller
 
         UserFollow::create(['follower_id' => $authId, 'following_id' => $user->id]);
 
+        app(\App\Services\NotificationService::class)->push(
+            recipient: $user,
+            type: 'follow',
+            copy: [
+                'title' => $request->user()->name . ' started following you',
+                'link'  => '/profile/' . $authId,
+            ],
+            actor: $request->user(),
+            subject: $request->user(),
+        );
+
         return response()->json(['following' => true, 'message' => 'Now following']);
     }
 }

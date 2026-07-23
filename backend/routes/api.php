@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\PostCommentController;
 use App\Http\Controllers\Api\V1\SafetyController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\UploadController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\UserController;
@@ -105,6 +106,11 @@ Route::prefix('v1')->group(function () {
 
         // Social graph
         Route::post('/users/{user}/follow', [UserController::class, 'follow']);
+
+        // ── Notifications ─────────────────────────────────────────
+        Route::get('/notifications',         [NotificationController::class, 'index']);
+        Route::get('/notifications/unread',  [NotificationController::class, 'unread']);
+        Route::post('/notifications/read',   [NotificationController::class, 'markRead']);
 
         // ── Payments ──────────────────────────────────────────────
         Route::get('/payments',                  [PaymentController::class, 'index']);

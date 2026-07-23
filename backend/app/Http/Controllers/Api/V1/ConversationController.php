@@ -306,6 +306,23 @@ class ConversationController extends Controller
 
         broadcast(new ConversationMessageSent($message))->toOthers();
 
+        // The chat channel updates an open conversation live; this is the badge
+        // for someone who isn't looking at it. $recipient is already resolved
+        // above for the privacy check.
+        if ($recipient) {
+            app(\App\Services\NotificationService::class)->push(
+                recipient: $recipient,
+                type: 'message',
+                copy: [
+                    'title' => auth()->user()->name . ' sent you a message',
+                    'body'  => \Illuminate\Support\Str::limit($message->body ?: 'Sent an attachment', 60),
+                    'link'  => '/messages/' . $conversation->id,
+                ],
+                actor: auth()->user(),
+                subject: $conversation,
+            );
+        }
+
         return response()->json([
             'message' => 'Message sent',
             'data'    => $this->formatMessage($message, $userId),

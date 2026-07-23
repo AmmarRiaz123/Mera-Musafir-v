@@ -234,6 +234,23 @@ class TripController extends Controller
             $trip->increment('current_count');
         }
 
+        // Tell the host — whether it's a fresh join or a request to approve.
+        $host = $trip->creator;
+        if ($host) {
+            app(\App\Services\NotificationService::class)->push(
+                recipient: $host,
+                type: 'trip_join',
+                copy: [
+                    'title' => $status === 'joined'
+                        ? $user->name . ' joined ' . $trip->title
+                        : $user->name . ' asked to join ' . $trip->title,
+                    'link'  => '/trips/' . $trip->id,
+                ],
+                actor: $user,
+                subject: $trip,
+            );
+        }
+
         $message = $status === 'joined'
             ? 'You have joined the trip'
             : 'Join request sent — waiting for host approval';
