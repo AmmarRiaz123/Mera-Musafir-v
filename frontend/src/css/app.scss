@@ -49,7 +49,8 @@
 .composer-dialog .q-dialog__backdrop,
 .report-dialog .q-dialog__backdrop,
 .request-dialog .q-dialog__backdrop,
-.connections-dialog .q-dialog__backdrop {
+.connections-dialog .q-dialog__backdrop,
+.book-dialog .q-dialog__backdrop {
   backdrop-filter: blur(6px);
   background: rgba(43, 27, 51, 0.42);
 }

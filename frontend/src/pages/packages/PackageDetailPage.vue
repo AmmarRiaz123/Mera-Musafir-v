@@ -268,43 +268,79 @@
     />
 
     <!-- Book dialog -->
-    <q-dialog v-model="showBookDialog" persistent>
-      <q-card style="min-width: 360px">
-        <q-card-section>
-          <div class="text-h6">Book Package</div>
-          <div class="text-body2 text-grey-6">{{ pkg?.title }}</div>
-        </q-card-section>
-        <q-card-section class="column q-gutter-sm">
-          <q-input
-            v-model.number="bookForm.travelers_count"
-            type="number"
-            :min="1"
-            :max="pkg?.spots_left"
-            label="Number of Travelers"
-            outlined dense
-          />
-          <div class="text-subtitle1 text-weight-bold text-deep-purple">
-            Total: PKR {{ fmt((pkg?.price_per_person ?? 0) * (bookForm.travelers_count || 0)) }}
+    <q-dialog v-model="showBookDialog" persistent class="book-dialog" transition-show="jump-up" transition-hide="jump-down">
+      <q-card class="bk-card">
+        <header class="bk-head">
+          <q-avatar rounded size="46px" class="bk-thumb">
+            <img v-if="pkg?.cover_image" :src="pkg.cover_image" />
+            <q-icon v-else name="landscape" size="22px" color="deep-purple" />
+          </q-avatar>
+          <div class="bk-head-text">
+            <div class="bk-title">Book this trip</div>
+            <div class="bk-sub">{{ pkg?.title }}</div>
           </div>
-          <q-input
-            v-model="bookForm.notes"
-            label="Notes (optional)"
-            outlined dense
-            type="textarea"
-            :rows="2"
-            placeholder="Any special requirements or questions..."
-          />
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat label="Cancel" v-close-popup />
+          <q-btn flat round dense size="sm" icon="close" color="grey-7" v-close-popup />
+        </header>
+
+        <div class="bk-body">
+          <div class="bk-label">How many travellers?</div>
+          <div class="bk-stepper">
+            <button
+              type="button" class="bk-step" :disabled="bookForm.travelers_count <= 1"
+              @click="bookForm.travelers_count = Math.max(1, (bookForm.travelers_count || 1) - 1)"
+            >
+              <q-icon name="remove" size="20px" />
+            </button>
+            <div class="bk-count">
+              <span class="bk-count-n">{{ bookForm.travelers_count || 1 }}</span>
+              <span class="bk-count-l">{{ bookForm.travelers_count === 1 ? 'traveller' : 'travellers' }}</span>
+            </div>
+            <button
+              type="button" class="bk-step" :disabled="bookForm.travelers_count >= (pkg?.spots_left ?? 1)"
+              @click="bookForm.travelers_count = Math.min(pkg?.spots_left ?? 1, (bookForm.travelers_count || 1) + 1)"
+            >
+              <q-icon name="add" size="20px" />
+            </button>
+          </div>
+          <div class="bk-remain">
+            <q-icon name="event_seat" size="13px" />{{ pkg?.spots_left }} seat{{ pkg?.spots_left !== 1 ? 's' : '' }} left on this departure
+          </div>
+
+          <div class="bk-wrap">
+            <q-input
+              v-model="bookForm.notes"
+              class="bk-notes" borderless autogrow :rows="2" :maxlength="1000"
+              placeholder="Anything the agency should know? Dietary needs, questions, a pickup point…"
+            />
+          </div>
+
+          <div class="bk-lines">
+            <div class="bk-line">
+              <span>PKR {{ fmt(pkg?.price_per_person ?? 0) }} × {{ bookForm.travelers_count || 1 }}</span>
+              <b>PKR {{ fmt((pkg?.price_per_person ?? 0) * (bookForm.travelers_count || 1)) }}</b>
+            </div>
+            <div class="bk-line bk-line--total">
+              <span>Total</span>
+              <b>PKR {{ fmt((pkg?.price_per_person ?? 0) * (bookForm.travelers_count || 1)) }}</b>
+            </div>
+          </div>
+
+          <p class="bk-note">
+            <q-icon name="verified_user" size="13px" />
+            You won't be charged yet — the agency reviews your request first, then you pay.
+          </p>
+        </div>
+
+        <footer class="bk-actions">
+          <q-btn flat no-caps color="grey-7" label="Cancel" v-close-popup />
           <q-btn
-            unelevated color="deep-purple"
-            label="Confirm Booking"
+            unelevated rounded no-caps color="deep-purple"
+            icon="send" label="Send request"
             :loading="booking"
             :disable="!bookForm.travelers_count || bookForm.travelers_count < 1"
             @click="submitBooking"
           />
-        </q-card-actions>
+        </footer>
       </q-card>
     </q-dialog>
   </q-page>
@@ -452,5 +488,88 @@ const fmt = (n) => Number(n || 0).toLocaleString()
   text-transform: uppercase;
   color: #9b8aa5;
   margin-bottom: 12px;
+}
+
+/* ── Book dialog ─────────────────────────────────────── */
+.bk-card { width: 420px; max-width: 94vw; border-radius: 16px; overflow: hidden; }
+
+.bk-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 14px 13px; border-bottom: 1px solid #f4eff7;
+  background: linear-gradient(180deg, #f7f0fb, #fff);
+}
+.bk-thumb { flex-shrink: 0; background: #efe4f6; box-shadow: 0 2px 8px rgba(43, 27, 51, 0.12); }
+.bk-head-text { flex: 1; min-width: 0; }
+.bk-title {
+  font-size: 16px; font-weight: 700; line-height: 1.2;
+  background: linear-gradient(135deg, #4a148c, #7b1fa2);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.bk-sub {
+  font-size: 12.5px; color: #7a6a82; margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.bk-body { padding: 16px 14px 4px; }
+.bk-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #a99bb2; margin-bottom: 9px;
+}
+
+.bk-stepper {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px; border: 1px solid #ece6f0; border-radius: 13px; background: #fcfafd;
+}
+.bk-step {
+  display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0;
+  border: 1px solid #e5dced; border-radius: 10px; background: #fff; cursor: pointer;
+  color: #6a3f86; transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.bk-step:hover:not(:disabled) { border-color: #c9b3d6; background: #f7f3fa; }
+.bk-step:disabled { opacity: 0.4; cursor: not-allowed; }
+.bk-count { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.bk-count-n {
+  font-size: 22px; font-weight: 700;
+  background: linear-gradient(135deg, #4a148c, #7b1fa2);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.bk-count-l { font-size: 11px; color: #9b8aa5; }
+
+.bk-remain {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 7px; font-size: 11.5px; color: #9b8aa5;
+}
+
+.bk-wrap {
+  margin-top: 14px; padding: 3px 12px;
+  border: 1px solid #ece6f0; border-radius: 12px; background: #fcfafd;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.bk-wrap:focus-within { border-color: #c9b3d6; background: #fff; }
+.bk-notes { font-size: 13px; }
+.bk-notes :deep(textarea) { max-height: 20vh; overflow-y: auto; }
+
+.bk-lines { display: flex; flex-direction: column; gap: 7px; margin-top: 16px; }
+.bk-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 13px; color: #7a6a82;
+}
+.bk-line b { color: #2b1b33; font-weight: 600; }
+.bk-line--total {
+  border-top: 1px solid #f4eff7; padding-top: 8px; margin-top: 1px; font-size: 14.5px;
+}
+.bk-line--total b { color: #4a148c; font-size: 17px; }
+
+.bk-note {
+  display: flex; align-items: flex-start; gap: 6px;
+  margin: 13px 0 0; padding: 9px 11px;
+  border-radius: 10px; background: #f7f3fa; border: 1px solid #f0eaf4;
+  font-size: 11.5px; line-height: 1.45; color: #8a7a93;
+}
+.bk-note .q-icon { margin-top: 1px; flex-shrink: 0; }
+
+.bk-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 14px 14px; border-top: 1px solid #f4eff7; background: #fcfafd;
 }
 </style>
