@@ -182,6 +182,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/trips/{trip}/join',                  [TripController::class, 'join']);
         Route::post('/trips/{trip}/leave',                 [TripController::class, 'leave']);
         Route::post('/trips/{trip}/members/{userId}/approve', [TripController::class, 'approve']);
+        Route::post('/trips/{trip}/members/{userId}/remove',  [TripController::class, 'removeMember']);
 
         // Chat
         Route::get('/trips/{trip}/chat/messages',  [ChatController::class, 'messages']);

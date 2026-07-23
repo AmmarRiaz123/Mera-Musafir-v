@@ -331,4 +331,57 @@ class TripController extends Controller
 
         return response()->json(['message' => 'Member approved']);
     }
+
+    /**
+     * POST /trips/{trip}/members/{userId}/remove — the host removes someone.
+     *
+     * Mirrors leave() so the headcount and membership row stay consistent: the
+     * seat is given back and the row is marked 'left' (not deleted), so a
+     * kicked traveller can still ask to rejoin later. The host can't remove
+     * themselves — that's what leave/delete are for.
+     */
+    public function removeMember(Trip $trip, $userId)
+    {
+        if ($trip->creator_id !== auth()->id()) {
+            return response()->json(['message' => 'Only the host can remove members'], 403);
+        }
+
+        if ((int) $userId === $trip->creator_id) {
+            return response()->json(['message' => "You can't remove yourself — you're the host."], 422);
+        }
+
+        $member = TripMember::where('trip_id', $trip->id)
+            ->where('user_id', $userId)
+            ->whereIn('status', ['joined', 'pending'])
+            ->first();
+
+        if (!$member) {
+            return Messages::json('not_a_member');
+        }
+
+        if ($member->status === 'joined') {
+            $trip->decrement('current_count');
+        }
+
+        $member->update(['status' => 'left']);
+
+        // Tell them, plainly. A silent disappearance from a group chat is worse
+        // than a clear "the host removed you".
+        $removed = \App\Models\User::find($userId);
+        if ($removed) {
+            app(\App\Services\NotificationService::class)->push(
+                recipient: $removed,
+                type: 'trip_join',
+                copy: [
+                    'title' => 'You were removed from ' . $trip->title,
+                    'body'  => 'The host removed you from this trip.',
+                    'link'  => '/trips',
+                ],
+                actor: auth()->user(),
+                subject: $trip,
+            );
+        }
+
+        return response()->json(['message' => 'Member removed from the trip']);
+    }
 }

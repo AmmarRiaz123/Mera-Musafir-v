@@ -331,6 +331,13 @@
                       <q-item-section avatar><q-icon name="flag" size="xs" color="negative" /></q-item-section>
                       <q-item-section class="text-negative">Report</q-item-section>
                     </q-item>
+                    <template v-if="isHost && member.role !== 'host'">
+                      <q-separator />
+                      <q-item clickable @click="removeMember(member)">
+                        <q-item-section avatar><q-icon name="person_remove" size="xs" color="negative" /></q-item-section>
+                        <q-item-section class="text-negative">Remove from trip</q-item-section>
+                      </q-item>
+                    </template>
                   </q-list>
                 </q-menu>
               </q-btn>
@@ -401,6 +408,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { api } from 'src/boot/axios'
 import { useTripStore } from 'src/stores/tripStore'
 import { useAuthStore } from 'src/stores/authStore'
 import { useMatchStore } from 'src/stores/matchStore'
@@ -573,6 +581,23 @@ const blockMember = async (member) => {
 const reportMember = (member) => {
   memberReportTarget.value = member
   memberReportDialog.value = true
+}
+
+const removeMember = (member) => {
+  $q.dialog({
+    title: 'Remove from trip',
+    message: `Remove ${member.name} from ${trip.value.title}? They lose access to the group chat and planning. They can ask to rejoin later.`,
+    cancel: { flat: true, noCaps: true, color: 'grey-7', label: 'Cancel' },
+    ok: { unelevated: true, rounded: true, noCaps: true, color: 'negative', label: 'Remove' },
+  }).onOk(async () => {
+    try {
+      await api.post(`/api/v1/trips/${trip.value.id}/members/${member.id}/remove`)
+      await loadTrip(trip.value.id)
+      $q.notify({ color: 'positive', icon: 'check_circle', message: `${member.name} removed from the trip`, position: 'top' })
+    } catch (err) {
+      $q.notify({ color: 'negative', message: err.response?.data?.message || 'Could not remove them.', position: 'top' })
+    }
+  })
 }
 </script>
 
